@@ -16,25 +16,40 @@ export type Database = {
     Tables: {
       "Exam-prep": {
         Row: {
+          course: string | null
           created_at: string
+          description: string | null
+          download_count: number | null
           file_path: string | null
           id: number
+          is_published: boolean | null
+          resource_type: string | null
           subject: string | null
           title: string | null
           year: number | null
         }
         Insert: {
+          course?: string | null
           created_at?: string
+          description?: string | null
+          download_count?: number | null
           file_path?: string | null
           id?: number
+          is_published?: boolean | null
+          resource_type?: string | null
           subject?: string | null
           title?: string | null
           year?: number | null
         }
         Update: {
+          course?: string | null
           created_at?: string
+          description?: string | null
+          download_count?: number | null
           file_path?: string | null
           id?: number
+          is_published?: boolean | null
+          resource_type?: string | null
           subject?: string | null
           title?: string | null
           year?: number | null
@@ -46,7 +61,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_download_count: {
+        Args: { resource_id: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
