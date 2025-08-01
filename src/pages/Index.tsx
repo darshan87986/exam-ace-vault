@@ -63,12 +63,14 @@ const Index = () => {
       // Increment download count
       await supabase.rpc("increment_download_count", { resource_id: resourceId });
       
-      // Create download URL
-      const { data } = supabase.storage.from("question-papers").getPublicUrl(filePath);
+      // Use the file path directly if it's already a full URL, otherwise construct it
+      const downloadUrl = filePath.startsWith('http') 
+        ? filePath 
+        : supabase.storage.from("question-papers").getPublicUrl(filePath).data.publicUrl;
       
       // Trigger download
       const link = document.createElement("a");
-      link.href = data.publicUrl;
+      link.href = downloadUrl;
       link.download = title;
       link.click();
     } catch (error) {
