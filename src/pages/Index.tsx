@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Download, BookOpen, FileText, GraduationCap, Users } from "lucide-react";
+import { Search, Download, BookOpen, FileText, GraduationCap, Users, ArrowLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
@@ -17,17 +17,38 @@ interface ExamResource {
   download_count: number;
   file_path: string;
   description: string;
+  degree_id?: string;
+}
+
+interface Degree {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
 }
 
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [resources, setResources] = useState<ExamResource[]>([]);
+  const [degrees, setDegrees] = useState<Degree[]>([]);
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState<string>("all");
+  const [selectedDegree, setSelectedDegree] = useState<Degree | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string>("");
+  const [currentView, setCurrentView] = useState<"home" | "degrees" | "subjects" | "resources">("home");
 
   useEffect(() => {
-    fetchResources();
-  }, []);
+    if (currentView === "home") {
+      fetchResources();
+    } else if (currentView === "degrees") {
+      fetchDegrees();
+    } else if (currentView === "subjects" && selectedDegree) {
+      fetchSubjects();
+    } else if (currentView === "resources" && selectedDegree && selectedSubject) {
+      fetchResourcesByDegreeAndSubject();
+    }
+  }, [currentView, selectedDegree, selectedSubject]);
 
   const fetchResources = async () => {
     try {
@@ -47,6 +68,64 @@ const Index = () => {
     }
   };
 
+  const fetchDegrees = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("degrees" as any)
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+      setDegrees((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching degrees:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("Exam-prep" as any)
+        .select("subject")
+        .eq("degree_id", selectedDegree?.id)
+        .eq("is_published", true);
+
+      if (error) throw error;
+      
+      const uniqueSubjects = [...new Set(data?.map((item: any) => item.subject).filter(Boolean))];
+      setSubjects(uniqueSubjects);
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchResourcesByDegreeAndSubject = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("Exam-prep" as any)
+        .select("*")
+        .eq("degree_id", selectedDegree?.id)
+        .eq("subject", selectedSubject)
+        .eq("is_published", true)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setResources((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching resources:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredResources = resources.filter((resource) => {
     const matchesSearch = 
       resource.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -57,6 +136,31 @@ const Index = () => {
     
     return matchesSearch && matchesType;
   });
+
+  const handleDegreeSelect = (degree: Degree) => {
+    setSelectedDegree(degree);
+    setCurrentView("subjects");
+  };
+
+  const handleSubjectSelect = (subject: string) => {
+    setSelectedSubject(subject);
+    setCurrentView("resources");
+  };
+
+  const handleBackToHome = () => {
+    setSelectedDegree(null);
+    setSelectedSubject("");
+    setCurrentView("home");
+  };
+
+  const handleBackToDegrees = () => {
+    setSelectedSubject("");
+    setCurrentView("degrees");
+  };
+
+  const handleBackToSubjects = () => {
+    setCurrentView("subjects");
+  };
 
   const handleDownload = async (resourceId: number, filePath: string, title: string) => {
     try {
@@ -126,134 +230,397 @@ const Index = () => {
             />
           </div>
 
-          {/* Filter Tabs */}
-          <div className="flex justify-center space-x-2 mb-12">
-            {[
-              { key: "all", label: "All Resources" },
-              { key: "question_paper", label: "Question Papers" },
-              { key: "solved_paper", label: "Solved Papers" },
-              { key: "notes", label: "Study Notes" }
-            ].map((type) => (
+          {/* Navigation Buttons */}
+          <div className="flex justify-center space-x-4 mb-12">
+            <Button
+              size="lg"
+              onClick={() => setCurrentView("degrees")}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4"
+            >
+              <GraduationCap className="h-5 w-5 mr-2" />
+              Browse by Degree
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleBackToHome}
+              className="px-8 py-4"
+            >
+              <BookOpen className="h-5 w-5 mr-2" />
+              All Resources
+            </Button>
+          </div>
+
+          {/* Filter Tabs - Only show on home view */}
+          {currentView === "home" && (
+            <div className="flex justify-center space-x-2 mb-12">
+              {[
+                { key: "all", label: "All Resources" },
+                { key: "question_paper", label: "Question Papers" },
+                { key: "solved_paper", label: "Solved Papers" },
+                { key: "notes", label: "Study Notes" }
+              ].map((type) => (
+                <Button
+                  key={type.key}
+                  variant={selectedType === type.key ? "default" : "outline"}
+                  onClick={() => setSelectedType(type.key)}
+                  className="rounded-full"
+                >
+                  {type.label}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Dynamic Content Based on Current View */}
+      {currentView === "home" && (
+        <>
+          {/* Features Section */}
+          <section className="py-16 bg-card/50">
+            <div className="container mx-auto px-4">
+              <h3 className="text-3xl font-bold text-center text-foreground mb-12">Why Choose ExamAce Vault?</h3>
+              <div className="grid md:grid-cols-3 gap-8">
+                <Card className="text-center">
+                  <CardHeader>
+                    <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
+                    <CardTitle>Comprehensive Collection</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>
+                      Thousands of question papers, solved papers, and study notes covering all major subjects and courses.
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+                
+                <Card className="text-center">
+                  <CardHeader>
+                    <FileText className="h-12 w-12 text-primary mx-auto mb-4" />
+                    <CardTitle>High Quality Content</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>
+                      All resources are carefully curated and verified for accuracy. Get the most reliable study materials.
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+                
+                <Card className="text-center">
+                  <CardHeader>
+                    <Users className="h-12 w-12 text-primary mx-auto mb-4" />
+                    <CardTitle>Free Access</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>
+                      Complete free access to all resources. No hidden fees, no subscriptions. Education should be accessible to all.
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </section>
+
+          {/* Recent Resources */}
+          <section className="py-16">
+            <div className="container mx-auto px-4">
+              <h3 className="text-3xl font-bold text-center text-foreground mb-12">Recently Added Resources</h3>
+              
+              {loading ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardHeader>
+                        <div className="h-4 bg-muted rounded w-3/4"></div>
+                        <div className="h-3 bg-muted rounded w-1/2"></div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-20 bg-muted rounded"></div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredResources.map((resource) => (
+                    <Card key={resource.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg">{resource.title}</CardTitle>
+                            <CardDescription>{resource.course} • {resource.year}</CardDescription>
+                          </div>
+                          <Badge variant="secondary">
+                            {resource.resource_type.replace("_", " ")}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {resource.description || "Comprehensive study material for exam preparation"}
+                        </p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">
+                            <Download className="h-4 w-4 inline mr-1" />
+                            {resource.download_count} downloads
+                          </span>
+                          <Button
+                            size="sm"
+                            onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
+                          >
+                            Download
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+              
+              {!loading && filteredResources.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground text-lg">No resources found matching your search.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* Degrees View */}
+      {currentView === "degrees" && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
               <Button
-                key={type.key}
-                variant={selectedType === type.key ? "default" : "outline"}
-                onClick={() => setSelectedType(type.key)}
-                className="rounded-full"
+                variant="ghost"
+                onClick={handleBackToHome}
+                className="flex items-center gap-2"
               >
-                {type.label}
+                <ArrowLeft className="h-4 w-4" />
+                Back to Home
               </Button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 bg-card/50">
-        <div className="container mx-auto px-4">
-          <h3 className="text-3xl font-bold text-center text-foreground mb-12">Why Choose ExamAce Vault?</h3>
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="text-center">
-              <CardHeader>
-                <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
-                <CardTitle>Comprehensive Collection</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  Thousands of question papers, solved papers, and study notes covering all major subjects and courses.
-                </CardDescription>
-              </CardContent>
-            </Card>
-            
-            <Card className="text-center">
-              <CardHeader>
-                <FileText className="h-12 w-12 text-primary mx-auto mb-4" />
-                <CardTitle>High Quality Content</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  All resources are carefully curated and verified for accuracy. Get the most reliable study materials.
-                </CardDescription>
-              </CardContent>
-            </Card>
-            
-            <Card className="text-center">
-              <CardHeader>
-                <Users className="h-12 w-12 text-primary mx-auto mb-4" />
-                <CardTitle>Free Access</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  Complete free access to all resources. No hidden fees, no subscriptions. Education should be accessible to all.
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Recent Resources */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <h3 className="text-3xl font-bold text-center text-foreground mb-12">Recently Added Resources</h3>
-          
-          {loading ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardHeader>
-                    <div className="h-4 bg-muted rounded w-3/4"></div>
-                    <div className="h-3 bg-muted rounded w-1/2"></div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-20 bg-muted rounded"></div>
-                  </CardContent>
-                </Card>
-              ))}
             </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredResources.map((resource) => (
-                <Card key={resource.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{resource.title}</CardTitle>
-                        <CardDescription>{resource.course} • {resource.year}</CardDescription>
-                      </div>
-                      <Badge variant="secondary">
-                        {resource.resource_type.replace("_", " ")}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {resource.description || "Comprehensive study material for exam preparation"}
-                    </p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">
-                        <Download className="h-4 w-4 inline mr-1" />
-                        {resource.download_count} downloads
-                      </span>
-                      <Button
-                        size="sm"
-                        onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
-                      >
-                        Download
+            
+            <h3 className="text-3xl font-bold text-center text-foreground mb-12">Choose Your Degree</h3>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-20 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                {degrees.map((degree) => (
+                  <Card 
+                    key={degree.id} 
+                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
+                    onClick={() => handleDegreeSelect(degree)}
+                  >
+                    <CardHeader className="text-center">
+                      <GraduationCap className="h-16 w-16 text-primary mx-auto mb-4" />
+                      <CardTitle className="text-xl">{degree.code}</CardTitle>
+                      <CardDescription className="text-sm">{degree.name}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <p className="text-muted-foreground mb-4">
+                        {degree.description || `Access ${degree.code} resources including question papers, solved papers, and notes.`}
+                      </p>
+                      <Button className="w-full">
+                        Browse {degree.code} Resources
+                        <ChevronRight className="h-4 w-4 ml-2" />
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Subjects View */}
+      {currentView === "subjects" && selectedDegree && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={handleBackToDegrees}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Degrees
+              </Button>
+            </div>
+            
+            <div className="text-center mb-12">
+              <h3 className="text-3xl font-bold text-foreground mb-4">
+                {selectedDegree.name} - Choose Subject
+              </h3>
+              <p className="text-muted-foreground">
+                Select a subject to view available question papers, solved papers, and notes
+              </p>
+            </div>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-16 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {subjects.map((subject) => (
+                  <Card 
+                    key={subject} 
+                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
+                    onClick={() => handleSubjectSelect(subject)}
+                  >
+                    <CardHeader className="text-center">
+                      <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
+                      <CardTitle className="text-lg">{subject}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <Button className="w-full">
+                        View {subject} Resources
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {!loading && subjects.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">No subjects available for {selectedDegree.name}</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Resources View */}
+      {currentView === "resources" && selectedDegree && selectedSubject && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={handleBackToSubjects}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Subjects
+              </Button>
+            </div>
+            
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold text-foreground mb-4">
+                {selectedDegree.code} - {selectedSubject}
+              </h3>
+              <p className="text-muted-foreground">
+                Browse and download resources for {selectedSubject}
+              </p>
+            </div>
+
+            {/* Resource Type Filter */}
+            <div className="flex justify-center space-x-2 mb-8">
+              {[
+                { key: "all", label: "All Resources" },
+                { key: "question_paper", label: "Question Papers" },
+                { key: "solved_paper", label: "Solved Papers" },
+                { key: "notes", label: "Study Notes" }
+              ].map((type) => (
+                <Button
+                  key={type.key}
+                  variant={selectedType === type.key ? "default" : "outline"}
+                  onClick={() => setSelectedType(type.key)}
+                  className="rounded-full"
+                >
+                  {type.label}
+                </Button>
               ))}
             </div>
-          )}
-          
-          {!loading && filteredResources.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground text-lg">No resources found matching your search.</p>
-            </div>
-          )}
-        </div>
-      </section>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-20 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredResources.map((resource) => (
+                  <Card key={resource.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">{resource.title}</CardTitle>
+                          <CardDescription>{resource.course} • {resource.year}</CardDescription>
+                        </div>
+                        <Badge variant="secondary">
+                          {resource.resource_type.replace("_", " ")}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {resource.description || "Comprehensive study material for exam preparation"}
+                      </p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">
+                          <Download className="h-4 w-4 inline mr-1" />
+                          {resource.download_count} downloads
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
+                        >
+                          Download
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {!loading && filteredResources.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">
+                  No {selectedType === "all" ? "resources" : selectedType.replace("_", " ")} found for {selectedSubject}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-card border-t py-12">
