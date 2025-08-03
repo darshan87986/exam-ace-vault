@@ -18,6 +18,7 @@ interface ExamResource {
   file_path: string;
   description: string;
   degree_id?: string;
+  subject_id?: string;
 }
 
 interface Degree {
@@ -27,28 +28,47 @@ interface Degree {
   description?: string;
 }
 
+interface Semester {
+  id: string;
+  degree_id: string;
+  semester_number: number;
+  name: string;
+}
+
+interface Subject {
+  id: string;
+  semester_id: string;
+  name: string;
+  code: string;
+  description?: string;
+}
+
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [resources, setResources] = useState<ExamResource[]>([]);
   const [degrees, setDegrees] = useState<Degree[]>([]);
-  const [subjects, setSubjects] = useState<string[]>([]);
+  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedDegree, setSelectedDegree] = useState<Degree | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState<string>("");
-  const [currentView, setCurrentView] = useState<"home" | "degrees" | "subjects" | "resources">("home");
+  const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [currentView, setCurrentView] = useState<"home" | "degrees" | "semesters" | "subjects" | "resources">("home");
 
   useEffect(() => {
     if (currentView === "home") {
       fetchResources();
     } else if (currentView === "degrees") {
       fetchDegrees();
-    } else if (currentView === "subjects" && selectedDegree) {
+    } else if (currentView === "semesters" && selectedDegree) {
+      fetchSemesters();
+    } else if (currentView === "subjects" && selectedSemester) {
       fetchSubjects();
-    } else if (currentView === "resources" && selectedDegree && selectedSubject) {
-      fetchResourcesByDegreeAndSubject();
+    } else if (currentView === "resources" && selectedSubject) {
+      fetchResourcesBySubject();
     }
-  }, [currentView, selectedDegree, selectedSubject]);
+  }, [currentView, selectedDegree, selectedSemester, selectedSubject]);
 
   const fetchResources = async () => {
     try {
@@ -86,19 +106,37 @@ const Index = () => {
     }
   };
 
+  const fetchSemesters = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("semesters" as any)
+        .select("*")
+        .eq("degree_id", selectedDegree?.id)
+        .eq("is_active", true)
+        .order("semester_number");
+
+      if (error) throw error;
+      setSemesters((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching semesters:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchSubjects = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from("Exam-prep" as any)
-        .select("subject")
-        .eq("degree_id", selectedDegree?.id)
-        .eq("is_published", true);
+        .from("subjects" as any)
+        .select("*")
+        .eq("semester_id", selectedSemester?.id)
+        .eq("is_active", true)
+        .order("name");
 
       if (error) throw error;
-      
-      const uniqueSubjects = [...new Set(data?.map((item: any) => item.subject).filter(Boolean))];
-      setSubjects(uniqueSubjects);
+      setSubjects((data as any) || []);
     } catch (error) {
       console.error("Error fetching subjects:", error);
     } finally {
@@ -106,14 +144,13 @@ const Index = () => {
     }
   };
 
-  const fetchResourcesByDegreeAndSubject = async () => {
+  const fetchResourcesBySubject = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from("Exam-prep" as any)
         .select("*")
-        .eq("degree_id", selectedDegree?.id)
-        .eq("subject", selectedSubject)
+        .eq("subject_id", selectedSubject?.id)
         .eq("is_published", true)
         .order("created_at", { ascending: false });
 
@@ -139,23 +176,38 @@ const Index = () => {
 
   const handleDegreeSelect = (degree: Degree) => {
     setSelectedDegree(degree);
+    setSelectedSemester(null);
+    setSelectedSubject(null);
+    setCurrentView("semesters");
+  };
+
+  const handleSemesterSelect = (semester: Semester) => {
+    setSelectedSemester(semester);
+    setSelectedSubject(null);
     setCurrentView("subjects");
   };
 
-  const handleSubjectSelect = (subject: string) => {
+  const handleSubjectSelect = (subject: Subject) => {
     setSelectedSubject(subject);
     setCurrentView("resources");
   };
 
   const handleBackToHome = () => {
     setSelectedDegree(null);
-    setSelectedSubject("");
+    setSelectedSemester(null);
+    setSelectedSubject(null);
     setCurrentView("home");
   };
 
   const handleBackToDegrees = () => {
-    setSelectedSubject("");
+    setSelectedSemester(null);
+    setSelectedSubject(null);
     setCurrentView("degrees");
+  };
+
+  const handleBackToSemesters = () => {
+    setSelectedSubject(null);
+    setCurrentView("semesters");
   };
 
   const handleBackToSubjects = () => {
@@ -436,7 +488,7 @@ const Index = () => {
                         {degree.description || `Access ${degree.code} resources including question papers, solved papers, and notes.`}
                       </p>
                       <Button className="w-full">
-                        Browse {degree.code} Resources
+                        Browse {degree.code} Semesters
                         <ChevronRight className="h-4 w-4 ml-2" />
                       </Button>
                     </CardContent>
@@ -448,8 +500,8 @@ const Index = () => {
         </section>
       )}
 
-      {/* Subjects View */}
-      {currentView === "subjects" && selectedDegree && (
+      {/* Semesters View */}
+      {currentView === "semesters" && selectedDegree && (
         <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="flex items-center gap-4 mb-8">
@@ -465,7 +517,78 @@ const Index = () => {
             
             <div className="text-center mb-12">
               <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedDegree.name} - Choose Subject
+                {selectedDegree.name} - Choose Semester
+              </h3>
+              <p className="text-muted-foreground">
+                Select a semester to view available subjects
+              </p>
+            </div>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-16 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {semesters.map((semester) => (
+                  <Card 
+                    key={semester.id} 
+                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
+                    onClick={() => handleSemesterSelect(semester)}
+                  >
+                    <CardHeader className="text-center">
+                      <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl font-bold text-primary">{semester.semester_number}</span>
+                      </div>
+                      <CardTitle className="text-lg">{semester.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <Button className="w-full">
+                        View Subjects
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {!loading && semesters.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">No semesters available for {selectedDegree.name}</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Subjects View */}
+      {currentView === "subjects" && selectedSemester && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={handleBackToSemesters}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Semesters
+              </Button>
+            </div>
+            
+            <div className="text-center mb-12">
+              <h3 className="text-3xl font-bold text-foreground mb-4">
+                {selectedDegree?.code} - {selectedSemester.name} - Choose Subject
               </h3>
               <p className="text-muted-foreground">
                 Select a subject to view available question papers, solved papers, and notes
@@ -489,17 +612,21 @@ const Index = () => {
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {subjects.map((subject) => (
                   <Card 
-                    key={subject} 
+                    key={subject.id} 
                     className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
                     onClick={() => handleSubjectSelect(subject)}
                   >
                     <CardHeader className="text-center">
                       <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
-                      <CardTitle className="text-lg">{subject}</CardTitle>
+                      <CardTitle className="text-lg">{subject.name}</CardTitle>
+                      <CardDescription className="text-sm">{subject.code}</CardDescription>
                     </CardHeader>
                     <CardContent className="text-center">
+                      <p className="text-muted-foreground text-sm mb-4">
+                        {subject.description || `Study materials for ${subject.name}`}
+                      </p>
                       <Button className="w-full">
-                        View {subject} Resources
+                        View {subject.code} Resources
                         <ChevronRight className="h-4 w-4 ml-2" />
                       </Button>
                     </CardContent>
@@ -510,7 +637,7 @@ const Index = () => {
             
             {!loading && subjects.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">No subjects available for {selectedDegree.name}</p>
+                <p className="text-muted-foreground text-lg">No subjects available for {selectedSemester.name}</p>
               </div>
             )}
           </div>
@@ -518,7 +645,7 @@ const Index = () => {
       )}
 
       {/* Resources View */}
-      {currentView === "resources" && selectedDegree && selectedSubject && (
+      {currentView === "resources" && selectedSubject && (
         <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="flex items-center gap-4 mb-8">
@@ -534,10 +661,10 @@ const Index = () => {
             
             <div className="text-center mb-8">
               <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedDegree.code} - {selectedSubject}
+                {selectedDegree?.code} - {selectedSemester?.name} - {selectedSubject.name}
               </h3>
               <p className="text-muted-foreground">
-                Browse and download resources for {selectedSubject}
+                Browse and download resources for {selectedSubject.name}
               </p>
             </div>
 
@@ -614,7 +741,7 @@ const Index = () => {
             {!loading && filteredResources.length === 0 && (
               <div className="text-center py-12">
                 <p className="text-muted-foreground text-lg">
-                  No {selectedType === "all" ? "resources" : selectedType.replace("_", " ")} found for {selectedSubject}
+                  No {selectedType === "all" ? "resources" : selectedType.replace("_", " ")} found for {selectedSubject.name}
                 </p>
               </div>
             )}

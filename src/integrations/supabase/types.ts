@@ -14,10 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      degrees: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       "Exam-prep": {
         Row: {
           course: string | null
           created_at: string
+          degree_id: string | null
           description: string | null
           download_count: number | null
           file_path: string | null
@@ -25,12 +53,14 @@ export type Database = {
           is_published: boolean | null
           resource_type: string | null
           subject: string | null
+          subject_id: string | null
           title: string | null
           year: number | null
         }
         Insert: {
           course?: string | null
           created_at?: string
+          degree_id?: string | null
           description?: string | null
           download_count?: number | null
           file_path?: string | null
@@ -38,12 +68,14 @@ export type Database = {
           is_published?: boolean | null
           resource_type?: string | null
           subject?: string | null
+          subject_id?: string | null
           title?: string | null
           year?: number | null
         }
         Update: {
           course?: string | null
           created_at?: string
+          degree_id?: string | null
           description?: string | null
           download_count?: number | null
           file_path?: string | null
@@ -51,10 +83,99 @@ export type Database = {
           is_published?: boolean | null
           resource_type?: string | null
           subject?: string | null
+          subject_id?: string | null
           title?: string | null
           year?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "Exam-prep_degree_id_fkey"
+            columns: ["degree_id"]
+            isOneToOne: false
+            referencedRelation: "degrees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Exam-prep_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      semesters: {
+        Row: {
+          created_at: string
+          degree_id: string
+          id: string
+          is_active: boolean
+          name: string
+          semester_number: number
+        }
+        Insert: {
+          created_at?: string
+          degree_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          semester_number: number
+        }
+        Update: {
+          created_at?: string
+          degree_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          semester_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "semesters_degree_id_fkey"
+            columns: ["degree_id"]
+            isOneToOne: false
+            referencedRelation: "degrees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subjects: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          semester_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          semester_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          semester_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subjects_semester_id_fkey"
+            columns: ["semester_id"]
+            isOneToOne: false
+            referencedRelation: "semesters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
