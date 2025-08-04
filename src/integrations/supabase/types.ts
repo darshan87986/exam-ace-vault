@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      degree_comments: {
+        Row: {
+          comment_text: string
+          created_at: string
+          degree_id: string
+          id: string
+          is_approved: boolean
+          user_email: string | null
+          user_name: string
+        }
+        Insert: {
+          comment_text: string
+          created_at?: string
+          degree_id: string
+          id?: string
+          is_approved?: boolean
+          user_email?: string | null
+          user_name: string
+        }
+        Update: {
+          comment_text?: string
+          created_at?: string
+          degree_id?: string
+          id?: string
+          is_approved?: boolean
+          user_email?: string | null
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "degree_comments_degree_id_fkey"
+            columns: ["degree_id"]
+            isOneToOne: false
+            referencedRelation: "degrees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       degrees: {
         Row: {
           code: string
@@ -22,6 +60,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          university_id: string | null
         }
         Insert: {
           code: string
@@ -30,6 +69,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          university_id?: string | null
         }
         Update: {
           code?: string
@@ -38,8 +78,17 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          university_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "degrees_university_id_fkey"
+            columns: ["university_id"]
+            isOneToOne: false
+            referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       "Exam-prep": {
         Row: {
@@ -52,6 +101,7 @@ export type Database = {
           id: number
           is_published: boolean | null
           resource_type: string | null
+          show_in_recent: boolean
           subject: string | null
           subject_id: string | null
           title: string | null
@@ -67,6 +117,7 @@ export type Database = {
           id?: number
           is_published?: boolean | null
           resource_type?: string | null
+          show_in_recent?: boolean
           subject?: string | null
           subject_id?: string | null
           title?: string | null
@@ -82,6 +133,7 @@ export type Database = {
           id?: number
           is_published?: boolean | null
           resource_type?: string | null
+          show_in_recent?: boolean
           subject?: string | null
           subject_id?: string | null
           title?: string | null
@@ -176,6 +228,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      universities: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          location: string | null
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name?: string
+        }
+        Relationships: []
       }
     }
     Views: {

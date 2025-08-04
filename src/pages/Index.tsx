@@ -2,10 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Download, BookOpen, FileText, GraduationCap, Users, ArrowLeft, ChevronRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Download, BookOpen, FileText, GraduationCap, Users, ArrowLeft, ChevronRight, MapPin } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import { CommentSection } from "@/components/CommentSection";
 
 interface ExamResource {
   id: number;
@@ -43,22 +45,33 @@ interface Subject {
   description?: string;
 }
 
+interface University {
+  id: string;
+  name: string;
+  code: string;
+  location?: string;
+}
+
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [resources, setResources] = useState<ExamResource[]>([]);
   const [degrees, setDegrees] = useState<Degree[]>([]);
+  const [universities, setUniversities] = useState<University[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState<string>("all");
+  const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
   const [selectedDegree, setSelectedDegree] = useState<Degree | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const [currentView, setCurrentView] = useState<"home" | "degrees" | "semesters" | "subjects" | "resources">("home");
+  const [currentView, setCurrentView] = useState<"home" | "universities" | "degrees" | "semesters" | "subjects" | "resources">("home");
 
   useEffect(() => {
     if (currentView === "home") {
       fetchResources();
+    } else if (currentView === "universities") {
+      fetchUniversities();
     } else if (currentView === "degrees") {
       fetchDegrees();
     } else if (currentView === "semesters" && selectedDegree) {
@@ -68,7 +81,7 @@ const Index = () => {
     } else if (currentView === "resources" && selectedSubject) {
       fetchResourcesBySubject();
     }
-  }, [currentView, selectedDegree, selectedSemester, selectedSubject]);
+  }, [currentView, selectedUniversity, selectedDegree, selectedSemester, selectedSubject]);
 
   const fetchResources = async () => {
     try {
@@ -76,6 +89,7 @@ const Index = () => {
         .from("Exam-prep")
         .select("*")
         .eq("is_published", true)
+        .eq("show_in_recent", true)
         .order("created_at", { ascending: false })
         .limit(6);
 
@@ -88,14 +102,37 @@ const Index = () => {
     }
   };
 
-  const fetchDegrees = async () => {
+  const fetchUniversities = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from("degrees" as any)
+        .from("universities" as any)
         .select("*")
         .eq("is_active", true)
         .order("name");
+
+      if (error) throw error;
+      setUniversities((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching universities:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDegrees = async () => {
+    try {
+      setLoading(true);
+      let query = supabase
+        .from("degrees" as any)
+        .select("*")
+        .eq("is_active", true);
+      
+      if (selectedUniversity) {
+        query = query.eq("university_id", selectedUniversity.id);
+      }
+      
+      const { data, error } = await query.order("name");
 
       if (error) throw error;
       setDegrees((data as any) || []);
@@ -214,6 +251,21 @@ const Index = () => {
     setCurrentView("subjects");
   };
 
+  const handleUniversitySelect = (university: University) => {
+    setSelectedUniversity(university);
+    setSelectedDegree(null);
+    setSelectedSemester(null);
+    setSelectedSubject(null);
+    setCurrentView("degrees");
+  };
+
+  const handleBackToUniversities = () => {
+    setSelectedDegree(null);
+    setSelectedSemester(null);
+    setSelectedSubject(null);
+    setCurrentView("universities");
+  };
+
   const handleDownload = async (resourceId: number, filePath: string, title: string) => {
     try {
       // Increment download count
@@ -283,11 +335,20 @@ const Index = () => {
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex justify-center space-x-4 mb-12">
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
             <Button
               size="lg"
+              onClick={() => setCurrentView("universities")}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-4"
+            >
+              <MapPin className="h-5 w-5 mr-2" />
+              Browse by University
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
               onClick={() => setCurrentView("degrees")}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4"
+              className="px-6 sm:px-8 py-4"
             >
               <GraduationCap className="h-5 w-5 mr-2" />
               Browse by Degree
@@ -296,7 +357,7 @@ const Index = () => {
               size="lg"
               variant="outline"
               onClick={handleBackToHome}
-              className="px-8 py-4"
+              className="px-6 sm:px-8 py-4"
             >
               <BookOpen className="h-5 w-5 mr-2" />
               All Resources
@@ -439,8 +500,8 @@ const Index = () => {
         </>
       )}
 
-      {/* Degrees View */}
-      {currentView === "degrees" && (
+      {/* Universities View */}
+      {currentView === "universities" && (
         <section className="py-16">
           <div className="container mx-auto px-4">
             <div className="flex items-center gap-4 mb-8">
@@ -454,7 +515,85 @@ const Index = () => {
               </Button>
             </div>
             
-            <h3 className="text-3xl font-bold text-center text-foreground mb-12">Choose Your Degree</h3>
+            <h3 className="text-3xl font-bold text-center text-foreground mb-12">Choose Your University</h3>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-20 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                {universities.map((university) => (
+                  <Card 
+                    key={university.id} 
+                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
+                    onClick={() => handleUniversitySelect(university)}
+                  >
+                    <CardHeader className="text-center">
+                      <MapPin className="h-16 w-16 text-primary mx-auto mb-4" />
+                      <CardTitle className="text-xl">{university.code}</CardTitle>
+                      <CardDescription className="text-sm">{university.name}</CardDescription>
+                      {university.location && (
+                        <Badge variant="outline" className="mx-auto w-fit mt-2">
+                          {university.location}
+                        </Badge>
+                      )}
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <Button className="w-full">
+                        Browse {university.code} Degrees
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {!loading && universities.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">No universities available</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Degrees View */}
+      {currentView === "degrees" && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={selectedUniversity ? handleBackToUniversities : handleBackToHome}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {selectedUniversity ? `Back to Universities` : `Back to Home`}
+              </Button>
+            </div>
+            
+            <div className="text-center mb-12">
+              <h3 className="text-3xl font-bold text-foreground mb-4">
+                {selectedUniversity ? `${selectedUniversity.name} - Choose Your Degree` : `Choose Your Degree`}
+              </h3>
+              {selectedUniversity && (
+                <p className="text-muted-foreground">
+                  Select a degree program from {selectedUniversity.code}
+                </p>
+              )}
+            </div>
             
             {loading ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -749,50 +888,60 @@ const Index = () => {
         </section>
       )}
 
+      {/* Comment Sections for Degrees */}
+      {selectedDegree && currentView !== "home" && (
+        <section className="py-16 bg-muted/30">
+          <CommentSection 
+            degreeId={selectedDegree.id} 
+            degreeName={selectedDegree.name} 
+          />
+        </section>
+      )}
+
       {/* Footer */}
       <footer className="bg-card border-t py-12">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <GraduationCap className="h-6 w-6 text-primary" />
                 <span className="font-bold text-foreground">ExamAce Vault</span>
               </div>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Your trusted platform for academic resources and exam preparation materials.
               </p>
             </div>
             
             <div>
               <h4 className="font-semibold text-foreground mb-4">Quick Links</h4>
-              <ul className="space-y-2 text-muted-foreground">
-                <li><Link to="/resources" className="hover:text-foreground">All Resources</Link></li>
-                <li><Link to="/subjects" className="hover:text-foreground">Browse by Subject</Link></li>
-                <li><Link to="/search" className="hover:text-foreground">Advanced Search</Link></li>
+              <ul className="space-y-2 text-muted-foreground text-sm">
+                <li><Link to="/resources" className="hover:text-foreground transition-colors">All Resources</Link></li>
+                <li><Link to="/subjects" className="hover:text-foreground transition-colors">Browse by Subject</Link></li>
+                <li><Link to="/search" className="hover:text-foreground transition-colors">Advanced Search</Link></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-semibold text-foreground mb-4">Support</h4>
-              <ul className="space-y-2 text-muted-foreground">
-                <li><Link to="/about" className="hover:text-foreground">About Us</Link></li>
-                <li><Link to="/contact" className="hover:text-foreground">Contact</Link></li>
-                <li><Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
-                <li><Link to="/terms" className="hover:text-foreground">Terms of Service</Link></li>
+              <ul className="space-y-2 text-muted-foreground text-sm">
+                <li><Link to="/about" className="hover:text-foreground transition-colors">About Us</Link></li>
+                <li><Link to="/contact" className="hover:text-foreground transition-colors">Contact</Link></li>
+                <li><Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-semibold text-foreground mb-4">Connect</h4>
-              <p className="text-muted-foreground mb-4">
+              <p className="text-muted-foreground mb-4 text-sm">
                 Stay updated with the latest resources and exam tips.
               </p>
-              <Button className="w-full">Subscribe to Updates</Button>
+              <Button className="w-full text-sm">Subscribe to Updates</Button>
             </div>
           </div>
           
           <div className="border-t mt-8 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 ExamAce Vault. All rights reserved. Built with ❤️ for students.</p>
+            <p className="text-sm">&copy; 2024 ExamAce Vault. All rights reserved. Built with ❤️ for students.</p>
           </div>
         </div>
       </footer>
