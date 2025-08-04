@@ -1,947 +1,628 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Download, BookOpen, FileText, GraduationCap, Users, ArrowLeft, ChevronRight, MapPin } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Link } from "react-router-dom";
 import { CommentSection } from "@/components/CommentSection";
-
-interface ExamResource {
-  id: number;
-  title: string;
-  subject: string;
-  year: number;
-  course: string;
-  resource_type: string;
-  download_count: number;
-  file_path: string;
-  description: string;
-  degree_id?: string;
-  subject_id?: string;
-}
-
-interface Degree {
-  id: string;
-  name: string;
-  code: string;
-  description?: string;
-}
-
-interface Semester {
-  id: string;
-  degree_id: string;
-  semester_number: number;
-  name: string;
-}
-
-interface Subject {
-  id: string;
-  semester_id: string;
-  name: string;
-  code: string;
-  description?: string;
-}
+import { 
+  BookOpen, 
+  Download, 
+  Search, 
+  FileText, 
+  Users, 
+  Star,
+  GraduationCap,
+  Upload,
+  Trophy,
+  Clock,
+  Shield,
+  Target,
+  CheckCircle,
+  Phone,
+  Mail,
+  Info
+} from "lucide-react";
 
 interface University {
   id: string;
   name: string;
   code: string;
   location?: string;
+  is_active: boolean;
+}
+
+interface Degree {
+  id: string;
+  name: string;
+  description?: string;
+  university_id: string;
+  is_active: boolean;
+  subjects?: Subject[];
+}
+
+interface Subject {
+  id: string;
+  name: string;
+  semester: number;
+  degree_id: string;
+  resources?: ExamResource[];
+}
+
+interface ExamResource {
+  id: string;
+  title: string;
+  resource_type: string;
+  file_path: string;
+  subject_id: string;
+  show_in_recent: boolean;
+  created_at: string;
+  subject_name?: string;
+  degree_name?: string;
 }
 
 const Index = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [resources, setResources] = useState<ExamResource[]>([]);
-  const [degrees, setDegrees] = useState<Degree[]>([]);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [selectedUniversity, setSelectedUniversity] = useState("all");
   const [universities, setUniversities] = useState<University[]>([]);
-  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [degrees, setDegrees] = useState<Degree[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [recentResources, setRecentResources] = useState<ExamResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedType, setSelectedType] = useState<string>("all");
-  const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
-  const [selectedDegree, setSelectedDegree] = useState<Degree | null>(null);
-  const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const [currentView, setCurrentView] = useState<"home" | "universities" | "degrees" | "semesters" | "subjects" | "resources">("home");
 
   useEffect(() => {
-    if (currentView === "home") {
-      fetchResources();
-    } else if (currentView === "universities") {
-      fetchUniversities();
-    } else if (currentView === "degrees") {
-      fetchDegrees();
-    } else if (currentView === "semesters" && selectedDegree) {
-      fetchSemesters();
-    } else if (currentView === "subjects" && selectedSemester) {
-      fetchSubjects();
-    } else if (currentView === "resources" && selectedSubject) {
-      fetchResourcesBySubject();
-    }
-  }, [currentView, selectedUniversity, selectedDegree, selectedSemester, selectedSubject]);
+    fetchUniversities();
+    fetchRecentResources();
+  }, []);
 
-  const fetchResources = async () => {
+  useEffect(() => {
+    if (selectedUniversity !== "all") {
+      fetchDegreesByUniversity(selectedUniversity);
+    } else {
+      fetchAllDegrees();
+    }
+  }, [selectedUniversity]);
+
+  const fetchUniversities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("universities")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+      setUniversities(data || []);
+    } catch (error) {
+      console.error("Error fetching universities:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load universities",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchAllDegrees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("degrees")
+        .select(`
+          *,
+          subjects!inner(
+            id,
+            name,
+            semester,
+            exam_resources!inner(
+              id,
+              title,
+              type,
+              file_url,
+              subject_id,
+              show_in_recent,
+              created_at
+            )
+          )
+        `)
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+      
+      const degreesWithSubjects = data?.map(degree => ({
+        ...degree,
+        subjects: degree.subjects.map((subject: any) => ({
+          ...subject,
+          resources: subject.exam_resources || []
+        }))
+      })) || [];
+
+      setDegrees(degreesWithSubjects);
+    } catch (error) {
+      console.error("Error fetching degrees:", error);
+      toast({
+        title: "Error", 
+        description: "Failed to load degrees",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDegreesByUniversity = async (universityId: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("degrees")
+        .select(`
+          *,
+          subjects!inner(
+            id,
+            name,
+            semester,
+            exam_resources!inner(
+              id,
+              title,
+              type,
+              file_url,
+              subject_id,
+              show_in_recent,
+              created_at
+            )
+          )
+        `)
+        .eq("university_id", universityId)
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+      
+      const degreesWithSubjects = data?.map(degree => ({
+        ...degree,
+        subjects: degree.subjects.map((subject: any) => ({
+          ...subject,
+          resources: subject.exam_resources || []
+        }))
+      })) || [];
+
+      setDegrees(degreesWithSubjects);
+    } catch (error) {
+      console.error("Error fetching degrees by university:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load degrees",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRecentResources = async () => {
     try {
       const { data, error } = await supabase
         .from("Exam-prep")
-        .select("*")
-        .eq("is_published", true)
+        .select(`
+          id,
+          title,
+          resource_type,
+          file_path,
+          subject_id,
+          show_in_recent,
+          created_at
+        `)
         .eq("show_in_recent", true)
         .order("created_at", { ascending: false })
         .limit(6);
 
       if (error) throw error;
-      setResources(data || []);
-    } catch (error) {
-      console.error("Error fetching resources:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUniversities = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("universities" as any)
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) throw error;
-      setUniversities((data as any) || []);
-    } catch (error) {
-      console.error("Error fetching universities:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDegrees = async () => {
-    try {
-      setLoading(true);
-      let query = supabase
-        .from("degrees" as any)
-        .select("*")
-        .eq("is_active", true);
       
-      if (selectedUniversity) {
-        query = query.eq("university_id", selectedUniversity.id);
-      }
-      
-      const { data, error } = await query.order("name");
-
-      if (error) throw error;
-      setDegrees((data as any) || []);
+      setRecentResources(data || []);
     } catch (error) {
-      console.error("Error fetching degrees:", error);
-    } finally {
-      setLoading(false);
+      console.error("Error fetching recent resources:", error);
     }
   };
 
-  const fetchSemesters = async () => {
+  const handleDownload = async (fileUrl: string, title: string) => {
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("semesters" as any)
-        .select("*")
-        .eq("degree_id", selectedDegree?.id)
-        .eq("is_active", true)
-        .order("semester_number");
-
-      if (error) throw error;
-      setSemesters((data as any) || []);
-    } catch (error) {
-      console.error("Error fetching semesters:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSubjects = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("subjects" as any)
-        .select("*")
-        .eq("semester_id", selectedSemester?.id)
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) throw error;
-      setSubjects((data as any) || []);
-    } catch (error) {
-      console.error("Error fetching subjects:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchResourcesBySubject = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("Exam-prep" as any)
-        .select("*")
-        .eq("subject_id", selectedSubject?.id)
-        .eq("is_published", true)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setResources((data as any) || []);
-    } catch (error) {
-      console.error("Error fetching resources:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredResources = resources.filter((resource) => {
-    const matchesSearch = 
-      resource.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      resource.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      resource.course?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesType = selectedType === "all" || resource.resource_type === selectedType;
-    
-    return matchesSearch && matchesType;
-  });
-
-  const handleDegreeSelect = (degree: Degree) => {
-    setSelectedDegree(degree);
-    setSelectedSemester(null);
-    setSelectedSubject(null);
-    setCurrentView("semesters");
-  };
-
-  const handleSemesterSelect = (semester: Semester) => {
-    setSelectedSemester(semester);
-    setSelectedSubject(null);
-    setCurrentView("subjects");
-  };
-
-  const handleSubjectSelect = (subject: Subject) => {
-    setSelectedSubject(subject);
-    setCurrentView("resources");
-  };
-
-  const handleBackToHome = () => {
-    setSelectedDegree(null);
-    setSelectedSemester(null);
-    setSelectedSubject(null);
-    setCurrentView("home");
-  };
-
-  const handleBackToDegrees = () => {
-    setSelectedSemester(null);
-    setSelectedSubject(null);
-    setCurrentView("degrees");
-  };
-
-  const handleBackToSemesters = () => {
-    setSelectedSubject(null);
-    setCurrentView("semesters");
-  };
-
-  const handleBackToSubjects = () => {
-    setCurrentView("subjects");
-  };
-
-  const handleUniversitySelect = (university: University) => {
-    setSelectedUniversity(university);
-    setSelectedDegree(null);
-    setSelectedSemester(null);
-    setSelectedSubject(null);
-    setCurrentView("degrees");
-  };
-
-  const handleBackToUniversities = () => {
-    setSelectedDegree(null);
-    setSelectedSemester(null);
-    setSelectedSubject(null);
-    setCurrentView("universities");
-  };
-
-  const handleDownload = async (resourceId: number, filePath: string, title: string) => {
-    try {
-      // Increment download count
-      await supabase.rpc("increment_download_count", { resource_id: resourceId });
-      
-      // Use the file path directly if it's already a full URL, otherwise construct it
-      const downloadUrl = filePath.startsWith('http') 
-        ? filePath 
-        : supabase.storage.from("question-papers").getPublicUrl(filePath).data.publicUrl;
-      
-      // Trigger download
       const link = document.createElement("a");
-      link.href = downloadUrl;
+      link.href = fileUrl;
       link.download = title;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Download Started",
+        description: `Downloading ${title}`,
+      });
     } catch (error) {
       console.error("Download error:", error);
+      toast({
+        title: "Download Failed",
+        description: "There was an error downloading the file",
+        variant: "destructive",
+      });
     }
+  };
+
+  const filteredDegrees = degrees.filter(degree => {
+    if (searchTerm) {
+      return degree.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             degree.subjects?.some(subject => 
+               subject.name.toLowerCase().includes(searchTerm.toLowerCase())
+             );
+    }
+    return true;
+  });
+
+  const getFilteredSubjects = (subjects: Subject[]) => {
+    if (!subjects) return [];
+    
+    return subjects.map(subject => ({
+      ...subject,
+      resources: subject.resources?.filter(resource => {
+        if (activeFilter === "all") return true;
+        return resource.type === activeFilter;
+      }) || []
+    })).filter(subject => 
+      subject.resources.length > 0 || activeFilter === "all"
+    );
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
+    <div className="min-h-screen bg-gradient-to-br from-background to-secondary">
+      {/* Navigation */}
+      <nav className="bg-card/90 backdrop-blur-md border-b shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <GraduationCap className="h-8 w-8 text-primary" />
-              <h1 className="text-2xl font-bold text-foreground">ExamAce Vault</h1>
+              <BookOpen className="h-8 w-8 text-primary" />
+              <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">StudyHub</span>
             </div>
-            <nav className="hidden md:flex space-x-6">
-              <Link to="/resources" className="text-muted-foreground hover:text-foreground">All Resources</Link>
-              <Link to="/subjects" className="text-muted-foreground hover:text-foreground">Subjects</Link>
-              <Link to="/about" className="text-muted-foreground hover:text-foreground">About</Link>
-              <Link to="/contact" className="text-muted-foreground hover:text-foreground">Contact</Link>
-            </nav>
-            <Button asChild>
-              <Link to="/admin">Admin</Link>
+            <div className="flex items-center space-x-6">
+              <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:text-primary">
+                <Info className="h-4 w-4" />
+                <span>About Us</span>
+              </Button>
+              <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:text-primary">
+                <Phone className="h-4 w-4" />
+                <span>Contact Us</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="py-20 text-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 opacity-50"></div>
+        <div className="container mx-auto px-4 relative">
+          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-6">
+            Your Ultimate Study Resource Hub
+          </h1>
+          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed">
+            Access comprehensive study materials, previous year papers, and resources for your academic success. Join thousands of students already achieving their goals.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <Button size="lg" className="px-8 py-3 bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all duration-300">
+              Get Started
+            </Button>
+            <Button variant="outline" size="lg" className="px-8 py-3 border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300">
+              Learn More
             </Button>
           </div>
         </div>
-      </header>
+      </section>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary/10 via-background to-secondary/10 py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
-            Your Ultimate
-            <span className="text-primary"> Exam Resource </span>
-            Hub
-          </h2>
-          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Access thousands of previous year question papers, solved papers, and comprehensive study notes. 
-            Everything you need to ace your degree exams, all in one place.
-          </p>
+      {/* Why Choose Us Section */}
+      <section className="py-16 bg-card/50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Why Choose StudyHub?
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Discover what makes us the preferred choice for thousands of students
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <Card className="text-center p-6 hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-card to-secondary/30">
+              <CardContent className="p-0">
+                <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trophy className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">Quality Resources</h3>
+                <p className="text-muted-foreground text-sm">Curated study materials from top universities and expert faculty</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="text-center p-6 hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-card to-secondary/30">
+              <CardContent className="p-0">
+                <div className="w-16 h-16 bg-gradient-to-br from-accent to-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Clock className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">Always Updated</h3>
+                <p className="text-muted-foreground text-sm">Latest exam patterns and syllabus updates for current academic year</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="text-center p-6 hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-card to-secondary/30">
+              <CardContent className="p-0">
+                <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">Secure Access</h3>
+                <p className="text-muted-foreground text-sm">Safe and secure platform with reliable download links</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="text-center p-6 hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-card to-secondary/30">
+              <CardContent className="p-0">
+                <div className="w-16 h-16 bg-gradient-to-br from-accent to-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Target className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">Exam Focused</h3>
+                <p className="text-muted-foreground text-sm">Targeted preparation materials for better exam performance</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Search and Filter Section */}
+      <section className="py-16 bg-gradient-to-br from-card/80 to-secondary/50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold text-center mb-8 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Find Your Study Materials</h2>
+            
+            {/* University Filter */}
+            <div className="mb-6">
+              <label className="text-sm font-medium text-foreground mb-2 block">Select University</label>
+              <Select value={selectedUniversity} onValueChange={setSelectedUniversity}>
+                <SelectTrigger className="w-full h-12 border-2 border-border hover:border-primary transition-colors">
+                  <SelectValue placeholder="Choose your university" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Universities</SelectItem>
+                  {universities.map((university) => (
+                    <SelectItem key={university.id} value={university.id}>
+                      {university.name} ({university.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative mb-6">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+              <Input
+                type="text"
+                placeholder="Search by degree, subject, or resource type..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-12 py-4 text-lg h-14 border-2 border-border hover:border-primary focus:border-primary transition-colors bg-card/50"
+              />
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Button
+                variant={activeFilter === "all" ? "default" : "outline"}
+                onClick={() => setActiveFilter("all")}
+                className="flex items-center space-x-2 h-11 px-6 transition-all duration-300 hover:scale-105"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>All Resources</span>
+              </Button>
+              <Button
+                variant={activeFilter === "notes" ? "default" : "outline"}
+                onClick={() => setActiveFilter("notes")}
+                className="flex items-center space-x-2 h-11 px-6 transition-all duration-300 hover:scale-105"
+              >
+                <FileText className="h-4 w-4" />
+                <span>Notes</span>
+              </Button>
+              <Button
+                variant={activeFilter === "previous_papers" ? "default" : "outline"}
+                onClick={() => setActiveFilter("previous_papers")}
+                className="flex items-center space-x-2 h-11 px-6 transition-all duration-300 hover:scale-105"
+              >
+                <Star className="h-4 w-4" />
+                <span>Previous Papers</span>
+              </Button>
+              <Button
+                variant={activeFilter === "syllabus" ? "default" : "outline"}
+                onClick={() => setActiveFilter("syllabus")}
+                className="flex items-center space-x-2 h-11 px-6 transition-all duration-300 hover:scale-105"
+              >
+                <GraduationCap className="h-4 w-4" />
+                <span>Syllabus</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Recently Added Resources */}
+      <section className="py-16 bg-gradient-to-br from-secondary/30 to-background">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Recently Added Resources</h2>
           
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto relative mb-8">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-            <Input
-              type="text"
-              placeholder="Search by subject, course, or topic..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-12 text-lg"
-            />
-          </div>
-
-          {/* Navigation Buttons */}
-          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
-            <Button
-              size="lg"
-              onClick={() => setCurrentView("universities")}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-4"
-            >
-              <MapPin className="h-5 w-5 mr-2" />
-              Browse by University
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => setCurrentView("degrees")}
-              className="px-6 sm:px-8 py-4"
-            >
-              <GraduationCap className="h-5 w-5 mr-2" />
-              Browse by Degree
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={handleBackToHome}
-              className="px-6 sm:px-8 py-4"
-            >
-              <BookOpen className="h-5 w-5 mr-2" />
-              All Resources
-            </Button>
-          </div>
-
-          {/* Filter Tabs - Only show on home view */}
-          {currentView === "home" && (
-            <div className="flex justify-center space-x-2 mb-12">
-              {[
-                { key: "all", label: "All Resources" },
-                { key: "question_paper", label: "Question Papers" },
-                { key: "solved_paper", label: "Solved Papers" },
-                { key: "notes", label: "Study Notes" }
-              ].map((type) => (
-                <Button
-                  key={type.key}
-                  variant={selectedType === type.key ? "default" : "outline"}
-                  onClick={() => setSelectedType(type.key)}
-                  className="rounded-full"
-                >
-                  {type.label}
-                </Button>
+          {recentResources.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {recentResources.map((resource) => (
+                <Card key={resource.id} className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-0 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary" className="mb-2 bg-gradient-to-r from-primary/10 to-accent/10 text-primary border border-primary/20">
+                        {resource.type.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                      <Star className="h-4 w-4 text-yellow-500" />
+                    </div>
+                    <CardTitle className="text-lg font-semibold">{resource.title}</CardTitle>
+                    <CardDescription className="text-muted-foreground">
+                      {resource.subject_name} • {resource.degree_name}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span>Recently Added</span>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleDownload(resource.file_url, resource.title)}
+                        className="flex items-center space-x-1 bg-gradient-to-r from-primary to-accent hover:shadow-md transition-all duration-300"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span>Download</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground text-lg">No recent resources found</p>
             </div>
           )}
         </div>
       </section>
 
-      {/* Dynamic Content Based on Current View */}
-      {currentView === "home" && (
-        <>
-          {/* Features Section */}
-          <section className="py-16 bg-card/50">
-            <div className="container mx-auto px-4">
-              <h3 className="text-3xl font-bold text-center text-foreground mb-12">Why Choose ExamAce Vault?</h3>
-              <div className="grid md:grid-cols-3 gap-8">
-                <Card className="text-center">
-                  <CardHeader>
-                    <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>Comprehensive Collection</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      Thousands of question papers, solved papers, and study notes covering all major subjects and courses.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-                
-                <Card className="text-center">
-                  <CardHeader>
-                    <FileText className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>High Quality Content</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      All resources are carefully curated and verified for accuracy. Get the most reliable study materials.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-                
-                <Card className="text-center">
-                  <CardHeader>
-                    <Users className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>Free Access</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      Complete free access to all resources. No hidden fees, no subscriptions. Education should be accessible to all.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </section>
-
-          {/* Recent Resources */}
-          <section className="py-16">
-            <div className="container mx-auto px-4">
-              <h3 className="text-3xl font-bold text-center text-foreground mb-12">Recently Added Resources</h3>
-              
-              {loading ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(6)].map((_, i) => (
-                    <Card key={i} className="animate-pulse">
-                      <CardHeader>
-                        <div className="h-4 bg-muted rounded w-3/4"></div>
-                        <div className="h-3 bg-muted rounded w-1/2"></div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-20 bg-muted rounded"></div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredResources.map((resource) => (
-                    <Card key={resource.id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle className="text-lg">{resource.title}</CardTitle>
-                            <CardDescription>{resource.course} • {resource.year}</CardDescription>
-                          </div>
-                          <Badge variant="secondary">
-                            {resource.resource_type.replace("_", " ")}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {resource.description || "Comprehensive study material for exam preparation"}
-                        </p>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">
-                            <Download className="h-4 w-4 inline mr-1" />
-                            {resource.download_count} downloads
-                          </span>
-                          <Button
-                            size="sm"
-                            onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
-                          >
-                            Download
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-              
-              {!loading && filteredResources.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground text-lg">No resources found matching your search.</p>
-                </div>
-              )}
-            </div>
-          </section>
-        </>
-      )}
-
-      {/* Universities View */}
-      {currentView === "universities" && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={handleBackToHome}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Home
-              </Button>
-            </div>
-            
-            <h3 className="text-3xl font-bold text-center text-foreground mb-12">Choose Your University</h3>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(3)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-muted rounded w-3/4"></div>
-                      <div className="h-4 bg-muted rounded w-1/2"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-20 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                {universities.map((university) => (
-                  <Card 
-                    key={university.id} 
-                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
-                    onClick={() => handleUniversitySelect(university)}
-                  >
-                    <CardHeader className="text-center">
-                      <MapPin className="h-16 w-16 text-primary mx-auto mb-4" />
-                      <CardTitle className="text-xl">{university.code}</CardTitle>
-                      <CardDescription className="text-sm">{university.name}</CardDescription>
-                      {university.location && (
-                        <Badge variant="outline" className="mx-auto w-fit mt-2">
-                          {university.location}
-                        </Badge>
-                      )}
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Button className="w-full">
-                        Browse {university.code} Degrees
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!loading && universities.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">No universities available</p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Degrees View */}
-      {currentView === "degrees" && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={selectedUniversity ? handleBackToUniversities : handleBackToHome}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {selectedUniversity ? `Back to Universities` : `Back to Home`}
-              </Button>
-            </div>
-            
-            <div className="text-center mb-12">
-              <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedUniversity ? `${selectedUniversity.name} - Choose Your Degree` : `Choose Your Degree`}
-              </h3>
-              {selectedUniversity && (
-                <p className="text-muted-foreground">
-                  Select a degree program from {selectedUniversity.code}
-                </p>
-              )}
-            </div>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(4)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-muted rounded w-3/4"></div>
-                      <div className="h-4 bg-muted rounded w-1/2"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-20 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                {degrees.map((degree) => (
-                  <Card 
+      {/* Degrees and Resources Section */}
+      <section className="py-16 bg-gradient-to-br from-background to-secondary/50">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Browse by Degree Program</h2>
+          
+          {filteredDegrees.length > 0 ? (
+            <Tabs defaultValue={filteredDegrees[0]?.id} className="w-full">
+              <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 lg:grid-cols-6 mb-8 bg-card/50 backdrop-blur-sm border border-border/50">
+                {filteredDegrees.map((degree) => (
+                  <TabsTrigger 
                     key={degree.id} 
-                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
-                    onClick={() => handleDegreeSelect(degree)}
+                    value={degree.id} 
+                    className="text-sm font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-white transition-all duration-300"
                   >
-                    <CardHeader className="text-center">
-                      <GraduationCap className="h-16 w-16 text-primary mx-auto mb-4" />
-                      <CardTitle className="text-xl">{degree.code}</CardTitle>
-                      <CardDescription className="text-sm">{degree.name}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <p className="text-muted-foreground mb-4">
-                        {degree.description || `Access ${degree.code} resources including question papers, solved papers, and notes.`}
-                      </p>
-                      <Button className="w-full">
-                        Browse {degree.code} Semesters
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
+                    {degree.name}
+                  </TabsTrigger>
                 ))}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+              </TabsList>
 
-      {/* Semesters View */}
-      {currentView === "semesters" && selectedDegree && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={handleBackToDegrees}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Degrees
-              </Button>
-            </div>
-            
-            <div className="text-center mb-12">
-              <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedDegree.name} - Choose Semester
-              </h3>
-              <p className="text-muted-foreground">
-                Select a semester to view available subjects
-              </p>
-            </div>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-muted rounded w-3/4"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-16 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {semesters.map((semester) => (
-                  <Card 
-                    key={semester.id} 
-                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
-                    onClick={() => handleSemesterSelect(semester)}
-                  >
-                    <CardHeader className="text-center">
-                      <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span className="text-2xl font-bold text-primary">{semester.semester_number}</span>
-                      </div>
-                      <CardTitle className="text-lg">{semester.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Button className="w-full">
-                        View Subjects
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!loading && semesters.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">No semesters available for {selectedDegree.name}</p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+              {filteredDegrees.map((degree) => (
+                <TabsContent key={degree.id} value={degree.id} className="space-y-6">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {getFilteredSubjects(degree.subjects).map((subject) => (
+                      <Card key={subject.id} className="hover:shadow-xl transition-all duration-300 hover:scale-105 border-0 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm">
+                        <CardHeader>
+                          <CardTitle className="flex items-center justify-between">
+                            <span className="font-semibold text-foreground">{subject.name}</span>
+                            <Badge variant="outline" className="border-primary/30 text-primary bg-primary/10">{subject.semester} Sem</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {subject.resources?.map((resource) => (
+                              <div key={resource.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg border border-border/30 hover:bg-secondary/50 transition-colors">
+                                <div className="flex items-center space-x-3">
+                                  <FileText className="h-5 w-5 text-primary" />
+                                  <div>
+                                    <p className="font-medium text-sm text-foreground">{resource.title}</p>
+                                    <p className="text-xs text-muted-foreground">{resource.type.replace('_', ' ').toUpperCase()}</p>
+                                  </div>
+                                </div>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleDownload(resource.file_url, resource.title)}
+                                  className="border-primary/30 text-primary hover:bg-primary hover:text-white transition-all duration-300"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            {!subject.resources || subject.resources.length === 0 && (
+                              <p className="text-muted-foreground text-sm text-center py-4">No resources available yet</p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
 
-      {/* Subjects View */}
-      {currentView === "subjects" && selectedSemester && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={handleBackToSemesters}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Semesters
-              </Button>
-            </div>
-            
-            <div className="text-center mb-12">
-              <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedDegree?.code} - {selectedSemester.name} - Choose Subject
-              </h3>
-              <p className="text-muted-foreground">
-                Select a subject to view available question papers, solved papers, and notes
-              </p>
-            </div>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-muted rounded w-3/4"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-16 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {subjects.map((subject) => (
-                  <Card 
-                    key={subject.id} 
-                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
-                    onClick={() => handleSubjectSelect(subject)}
-                  >
-                    <CardHeader className="text-center">
-                      <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
-                      <CardTitle className="text-lg">{subject.name}</CardTitle>
-                      <CardDescription className="text-sm">{subject.code}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <p className="text-muted-foreground text-sm mb-4">
-                        {subject.description || `Study materials for ${subject.name}`}
-                      </p>
-                      <Button className="w-full">
-                        View {subject.code} Resources
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!loading && subjects.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">No subjects available for {selectedSemester.name}</p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Resources View */}
-      {currentView === "resources" && selectedSubject && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={handleBackToSubjects}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Subjects
-              </Button>
-            </div>
-            
-            <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedDegree?.code} - {selectedSemester?.name} - {selectedSubject.name}
-              </h3>
-              <p className="text-muted-foreground">
-                Browse and download resources for {selectedSubject.name}
-              </p>
-            </div>
-
-            {/* Resource Type Filter */}
-            <div className="flex justify-center space-x-2 mb-8">
-              {[
-                { key: "all", label: "All Resources" },
-                { key: "question_paper", label: "Question Papers" },
-                { key: "solved_paper", label: "Solved Papers" },
-                { key: "notes", label: "Study Notes" }
-              ].map((type) => (
-                <Button
-                  key={type.key}
-                  variant={selectedType === type.key ? "default" : "outline"}
-                  onClick={() => setSelectedType(type.key)}
-                  className="rounded-full"
-                >
-                  {type.label}
-                </Button>
+                  {/* Comment Section for each degree */}
+                  <div className="mt-12">
+                    <CommentSection degreeId={degree.id} degreeName={degree.name} />
+                  </div>
+                </TabsContent>
               ))}
+            </Tabs>
+          ) : (
+            <div className="text-center py-12">
+              <GraduationCap className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground text-lg">No degree programs found for the selected university</p>
             </div>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-4 bg-muted rounded w-3/4"></div>
-                      <div className="h-3 bg-muted rounded w-1/2"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-20 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredResources.map((resource) => (
-                  <Card key={resource.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{resource.title}</CardTitle>
-                          <CardDescription>{resource.course} • {resource.year}</CardDescription>
-                        </div>
-                        <Badge variant="secondary">
-                          {resource.resource_type.replace("_", " ")}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {resource.description || "Comprehensive study material for exam preparation"}
-                      </p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">
-                          <Download className="h-4 w-4 inline mr-1" />
-                          {resource.download_count} downloads
-                        </span>
-                        <Button
-                          size="sm"
-                          onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
-                        >
-                          Download
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!loading && filteredResources.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">
-                  No {selectedType === "all" ? "resources" : selectedType.replace("_", " ")} found for {selectedSubject.name}
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Comment Sections for Degrees */}
-      {selectedDegree && currentView !== "home" && (
-        <section className="py-16 bg-muted/30">
-          <CommentSection 
-            degreeId={selectedDegree.id} 
-            degreeName={selectedDegree.name} 
-          />
-        </section>
-      )}
+          )}
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="bg-card border-t py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <footer className="bg-gradient-to-br from-primary/90 to-accent/90 text-white py-12 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-transparent to-accent/20"></div>
+        <div className="container mx-auto px-4 relative">
+          <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <GraduationCap className="h-6 w-6 text-primary" />
-                <span className="font-bold text-foreground">ExamAce Vault</span>
+                <BookOpen className="h-6 w-6" />
+                <span className="text-xl font-bold">StudyHub</span>
               </div>
-              <p className="text-muted-foreground text-sm">
-                Your trusted platform for academic resources and exam preparation materials.
-              </p>
+              <p className="text-white/80">Your trusted companion for academic excellence and study resources.</p>
             </div>
             
             <div>
-              <h4 className="font-semibold text-foreground mb-4">Quick Links</h4>
-              <ul className="space-y-2 text-muted-foreground text-sm">
-                <li><Link to="/resources" className="hover:text-foreground transition-colors">All Resources</Link></li>
-                <li><Link to="/subjects" className="hover:text-foreground transition-colors">Browse by Subject</Link></li>
-                <li><Link to="/search" className="hover:text-foreground transition-colors">Advanced Search</Link></li>
-              </ul>
+              <h3 className="font-semibold mb-4">Quick Links</h3>
+              <div className="space-y-2">
+                <p className="text-white/70 hover:text-white cursor-pointer transition-colors">Home</p>
+                <p className="text-white/70 hover:text-white cursor-pointer transition-colors">Resources</p>
+                <p className="text-white/70 hover:text-white cursor-pointer transition-colors">Degrees</p>
+                <p className="text-white/70 hover:text-white cursor-pointer transition-colors">Contact</p>
+              </div>
             </div>
             
             <div>
-              <h4 className="font-semibold text-foreground mb-4">Support</h4>
-              <ul className="space-y-2 text-muted-foreground text-sm">
-                <li><Link to="/about" className="hover:text-foreground transition-colors">About Us</Link></li>
-                <li><Link to="/contact" className="hover:text-foreground transition-colors">Contact</Link></li>
-                <li><Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
-              </ul>
+              <h3 className="font-semibold mb-4">Support</h3>
+              <div className="space-y-2">
+                <p className="text-white/70 hover:text-white cursor-pointer transition-colors">Help Center</p>
+                <p className="text-white/70 hover:text-white cursor-pointer transition-colors">FAQ</p>
+                <p className="text-white/70 hover:text-white cursor-pointer transition-colors">Contact Us</p>
+                <p className="text-white/70 hover:text-white cursor-pointer transition-colors">Feedback</p>
+              </div>
             </div>
             
             <div>
-              <h4 className="font-semibold text-foreground mb-4">Connect</h4>
-              <p className="text-muted-foreground mb-4 text-sm">
-                Stay updated with the latest resources and exam tips.
-              </p>
-              <Button className="w-full text-sm">Subscribe to Updates</Button>
+              <h3 className="font-semibold mb-4">Connect</h3>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4" />
+                  <span className="text-white/80">Join our community</span>
+                </div>
+                <p className="text-white/70">Follow us for updates and study tips</p>
+              </div>
             </div>
           </div>
           
-          <div className="border-t mt-8 pt-8 text-center text-muted-foreground">
-            <p className="text-sm">&copy; 2024 ExamAce Vault. All rights reserved. Built with ❤️ for students.</p>
+          <div className="border-t border-white/20 mt-8 pt-8 text-center">
+            <p className="text-white/70">&copy; 2024 StudyHub. All rights reserved.</p>
           </div>
         </div>
       </footer>
