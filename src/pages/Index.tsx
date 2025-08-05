@@ -53,7 +53,7 @@ interface Subject {
 }
 
 interface ExamResource {
-  id: string;
+  id: number;
   title: string;
   resource_type: string;
   file_path: string;
@@ -118,15 +118,15 @@ const Index = () => {
             id,
             name,
             semester,
-            exam_resources!inner(
-              id,
-              title,
-              type,
-              file_url,
-              subject_id,
-              show_in_recent,
-              created_at
-            )
+              exam_resources!inner(
+                id,
+                title,
+                resource_type,
+                file_path,
+                subject_id,
+                show_in_recent,
+                created_at
+              )
           )
         `)
         .eq("is_active", true)
@@ -169,8 +169,8 @@ const Index = () => {
             exam_resources!inner(
               id,
               title,
-              type,
-              file_url,
+              resource_type,
+              file_path,
               subject_id,
               show_in_recent,
               created_at
@@ -269,7 +269,7 @@ const Index = () => {
       ...subject,
       resources: subject.resources?.filter(resource => {
         if (activeFilter === "all") return true;
-        return resource.type === activeFilter;
+        return resource.resource_type === activeFilter;
       }) || []
     })).filter(subject => 
       subject.resources.length > 0 || activeFilter === "all"
@@ -463,7 +463,7 @@ const Index = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <Badge variant="secondary" className="mb-2 bg-gradient-to-r from-primary/10 to-accent/10 text-primary border border-primary/20">
-                        {resource.type.replace('_', ' ').toUpperCase()}
+                        {resource.resource_type?.replace('_', ' ').toUpperCase()}
                       </Badge>
                       <Star className="h-4 w-4 text-yellow-500" />
                     </div>
@@ -480,7 +480,7 @@ const Index = () => {
                       </div>
                       <Button 
                         size="sm" 
-                        onClick={() => handleDownload(resource.file_url, resource.title)}
+                        onClick={() => handleDownload(resource.file_path, resource.title)}
                         className="flex items-center space-x-1 bg-gradient-to-r from-primary to-accent hover:shadow-md transition-all duration-300"
                       >
                         <Download className="h-4 w-4" />
@@ -538,13 +538,13 @@ const Index = () => {
                                   <FileText className="h-5 w-5 text-primary" />
                                   <div>
                                     <p className="font-medium text-sm text-foreground">{resource.title}</p>
-                                    <p className="text-xs text-muted-foreground">{resource.type.replace('_', ' ').toUpperCase()}</p>
+                                    <p className="text-xs text-muted-foreground">{resource.resource_type?.replace('_', ' ').toUpperCase()}</p>
                                   </div>
                                 </div>
                                 <Button 
                                   size="sm" 
                                   variant="outline"
-                                  onClick={() => handleDownload(resource.file_url, resource.title)}
+                                  onClick={() => handleDownload(resource.file_path, resource.title)}
                                   className="border-primary/30 text-primary hover:bg-primary hover:text-white transition-all duration-300"
                                 >
                                   <Download className="h-4 w-4" />
