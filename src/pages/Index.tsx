@@ -114,11 +114,15 @@ const Index = () => {
         .from("degrees")
         .select(`
           *,
-          subjects!inner(
+          semesters!inner(
             id,
             name,
-            semester,
-              exam_resources!inner(
+            semester_number,
+            subjects!inner(
+              id,
+              name,
+              semester_id,
+              "Exam-prep"!inner(
                 id,
                 title,
                 resource_type,
@@ -127,6 +131,7 @@ const Index = () => {
                 show_in_recent,
                 created_at
               )
+            )
           )
         `)
         .eq("is_active", true)
@@ -136,10 +141,13 @@ const Index = () => {
       
       const degreesWithSubjects = data?.map(degree => ({
         ...degree,
-        subjects: degree.subjects.map((subject: any) => ({
-          ...subject,
-          resources: subject.exam_resources || []
-        }))
+        subjects: degree.semesters?.flatMap((semester: any) => 
+          semester.subjects?.map((subject: any) => ({
+            ...subject,
+            semester: semester.semester_number,
+            resources: subject['Exam-prep'] || []
+          })) || []
+        ) || []
       })) || [];
 
       setDegrees(degreesWithSubjects);
@@ -162,18 +170,23 @@ const Index = () => {
         .from("degrees")
         .select(`
           *,
-          subjects!inner(
+          semesters!inner(
             id,
             name,
-            semester,
-            exam_resources!inner(
+            semester_number,
+            subjects!inner(
               id,
-              title,
-              resource_type,
-              file_path,
-              subject_id,
-              show_in_recent,
-              created_at
+              name,
+              semester_id,
+              "Exam-prep"!inner(
+                id,
+                title,
+                resource_type,
+                file_path,
+                subject_id,
+                show_in_recent,
+                created_at
+              )
             )
           )
         `)
@@ -185,10 +198,13 @@ const Index = () => {
       
       const degreesWithSubjects = data?.map(degree => ({
         ...degree,
-        subjects: degree.subjects.map((subject: any) => ({
-          ...subject,
-          resources: subject.exam_resources || []
-        }))
+        subjects: degree.semesters?.flatMap((semester: any) => 
+          semester.subjects?.map((subject: any) => ({
+            ...subject,
+            semester: semester.semester_number,
+            resources: subject['Exam-prep'] || []
+          })) || []
+        ) || []
       })) || [];
 
       setDegrees(degreesWithSubjects);
@@ -463,7 +479,7 @@ const Index = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <Badge variant="secondary" className="mb-2 bg-gradient-to-r from-primary/10 to-accent/10 text-primary border border-primary/20">
-                        {resource.resource_type?.replace('_', ' ').toUpperCase()}
+                        {resource.resource_type?.replace('_', ' ').toUpperCase() || 'RESOURCE'}
                       </Badge>
                       <Star className="h-4 w-4 text-yellow-500" />
                     </div>
@@ -538,7 +554,7 @@ const Index = () => {
                                   <FileText className="h-5 w-5 text-primary" />
                                   <div>
                                     <p className="font-medium text-sm text-foreground">{resource.title}</p>
-                                    <p className="text-xs text-muted-foreground">{resource.resource_type?.replace('_', ' ').toUpperCase()}</p>
+                                    <p className="text-xs text-muted-foreground">{resource.resource_type?.replace('_', ' ').toUpperCase() || 'RESOURCE'}</p>
                                   </div>
                                 </div>
                                 <Button 
