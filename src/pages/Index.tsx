@@ -297,10 +297,10 @@ const Index = () => {
               <h1 className="text-2xl font-bold text-foreground">ExamAce Vault</h1>
             </div>
             <nav className="hidden md:flex space-x-6">
-              <Link to="/resources" className="text-muted-foreground hover:text-foreground">All Resources</Link>
-              <Link to="/subjects" className="text-muted-foreground hover:text-foreground">Subjects</Link>
-              <Link to="/about" className="text-muted-foreground hover:text-foreground">About</Link>
-              <Link to="/contact" className="text-muted-foreground hover:text-foreground">Contact</Link>
+              <Link to="/resources" className="text-muted-foreground hover:text-primary transition-colors">All Resources</Link>
+              <Link to="/subjects" className="text-muted-foreground hover:text-primary transition-colors">Subjects</Link>
+              <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">About Us</Link>
+              <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">Contact Us</Link>
             </nav>
             <Button asChild>
               <Link to="/admin">Admin</Link>
@@ -309,12 +309,50 @@ const Index = () => {
         </div>
       </header>
 
+      {/* Why Choose Us Section */}
+      <section className="py-16 bg-gradient-to-r from-secondary/20 to-accent/20">
+        <div className="container mx-auto px-4">
+          <h3 className="text-3xl md:text-4xl font-bold text-center text-primary mb-12">Why Choose ExamAce Vault?</h3>
+          <div className="grid md:grid-cols-3 gap-8 mb-16">
+            <div className="text-center group">
+              <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-primary/20 transition-colors">
+                <BookOpen className="h-8 w-8 text-primary" />
+              </div>
+              <h4 className="text-xl font-semibold text-foreground mb-2">Comprehensive Collection</h4>
+              <p className="text-muted-foreground">
+                Thousands of question papers, solved papers, and study notes covering all major subjects and courses.
+              </p>
+            </div>
+            
+            <div className="text-center group">
+              <div className="bg-secondary/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-secondary/30 transition-colors">
+                <FileText className="h-8 w-8 text-secondary-foreground" />
+              </div>
+              <h4 className="text-xl font-semibold text-foreground mb-2">High Quality Content</h4>
+              <p className="text-muted-foreground">
+                All resources are carefully curated and verified for accuracy. Get the most reliable study materials.
+              </p>
+            </div>
+            
+            <div className="text-center group">
+              <div className="bg-accent/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-accent/30 transition-colors">
+                <Users className="h-8 w-8 text-accent-foreground" />
+              </div>
+              <h4 className="text-xl font-semibold text-foreground mb-2">Free Access</h4>
+              <p className="text-muted-foreground">
+                Complete free access to all resources. No hidden fees, no subscriptions. Education should be accessible to all.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-primary/10 via-background to-secondary/10 py-20">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
             Your Ultimate
-            <span className="text-primary"> Exam Resource </span>
+            <span className="bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent"> Exam Resource </span>
             Hub
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
@@ -339,25 +377,23 @@ const Index = () => {
             <Button
               size="lg"
               onClick={() => setCurrentView("universities")}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-4"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-4 shadow-lg hover:shadow-xl transition-all"
             >
               <MapPin className="h-5 w-5 mr-2" />
               Browse by University
             </Button>
             <Button
               size="lg"
-              variant="outline"
               onClick={() => setCurrentView("degrees")}
-              className="px-6 sm:px-8 py-4"
+              className="bg-secondary hover:bg-secondary/90 text-secondary-foreground px-6 sm:px-8 py-4 shadow-lg hover:shadow-xl transition-all"
             >
               <GraduationCap className="h-5 w-5 mr-2" />
               Browse by Degree
             </Button>
             <Button
               size="lg"
-              variant="outline"
               onClick={handleBackToHome}
-              className="px-6 sm:px-8 py-4"
+              className="bg-accent hover:bg-accent/90 text-accent-foreground px-6 sm:px-8 py-4 shadow-lg hover:shadow-xl transition-all"
             >
               <BookOpen className="h-5 w-5 mr-2" />
               All Resources
@@ -377,7 +413,11 @@ const Index = () => {
                   key={type.key}
                   variant={selectedType === type.key ? "default" : "outline"}
                   onClick={() => setSelectedType(type.key)}
-                  className="rounded-full"
+                  className={`rounded-full transition-all ${
+                    selectedType === type.key 
+                      ? "bg-primary text-primary-foreground shadow-lg" 
+                      : "hover:bg-secondary/20 hover:text-secondary-foreground"
+                  }`}
                 >
                   {type.label}
                 </Button>
@@ -390,46 +430,26 @@ const Index = () => {
       {/* Dynamic Content Based on Current View */}
       {currentView === "home" && (
         <>
-          {/* Features Section */}
-          <section className="py-16 bg-card/50">
+          {/* Stats Section */}
+          <section className="py-16 bg-gradient-to-r from-primary/5 to-secondary/5">
             <div className="container mx-auto px-4">
-              <h3 className="text-3xl font-bold text-center text-foreground mb-12">Why Choose ExamAce Vault?</h3>
-              <div className="grid md:grid-cols-3 gap-8">
-                <Card className="text-center">
-                  <CardHeader>
-                    <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>Comprehensive Collection</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      Thousands of question papers, solved papers, and study notes covering all major subjects and courses.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-                
-                <Card className="text-center">
-                  <CardHeader>
-                    <FileText className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>High Quality Content</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      All resources are carefully curated and verified for accuracy. Get the most reliable study materials.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-                
-                <Card className="text-center">
-                  <CardHeader>
-                    <Users className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>Free Access</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      Complete free access to all resources. No hidden fees, no subscriptions. Education should be accessible to all.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
+              <div className="grid md:grid-cols-4 gap-8 text-center">
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold text-primary">10,000+</div>
+                  <div className="text-muted-foreground">Question Papers</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold text-secondary-foreground">500+</div>
+                  <div className="text-muted-foreground">Universities</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold text-accent-foreground">100+</div>
+                  <div className="text-muted-foreground">Subjects</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-4xl font-bold text-primary">50,000+</div>
+                  <div className="text-muted-foreground">Downloads</div>
+                </div>
               </div>
             </div>
           </section>
@@ -456,14 +476,14 @@ const Index = () => {
               ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredResources.map((resource) => (
-                    <Card key={resource.id} className="hover:shadow-lg transition-shadow">
+                    <Card key={resource.id} className="hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 border-l-4 border-l-transparent hover:border-l-primary">
                       <CardHeader>
                         <div className="flex justify-between items-start">
                           <div>
-                            <CardTitle className="text-lg">{resource.title}</CardTitle>
-                            <CardDescription>{resource.course} • {resource.year}</CardDescription>
+                            <CardTitle className="text-lg text-foreground">{resource.title}</CardTitle>
+                            <CardDescription className="text-muted-foreground">{resource.course} • {resource.year}</CardDescription>
                           </div>
-                          <Badge variant="secondary">
+                          <Badge className="bg-secondary/20 text-secondary-foreground hover:bg-secondary/30">
                             {resource.resource_type.replace("_", " ")}
                           </Badge>
                         </div>
@@ -480,6 +500,7 @@ const Index = () => {
                           <Button
                             size="sm"
                             onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
+                            className="bg-secondary hover:bg-secondary/90 text-secondary-foreground"
                           >
                             Download
                           </Button>
