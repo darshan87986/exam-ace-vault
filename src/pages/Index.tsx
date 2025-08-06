@@ -146,6 +146,18 @@ const Index = () => {
     }
   }, [currentView, selectedUniversity, selectedDegree, selectedSemester, selectedSubject]);
 
+  // Separate useEffect for search functionality
+  useEffect(() => {
+    if (currentView === "home") {
+      const debounceTimer = setTimeout(() => {
+        setLoading(true);
+        fetchResources();
+      }, 300); // Debounce search by 300ms
+
+      return () => clearTimeout(debounceTimer);
+    }
+  }, [searchTerm, currentView]);
+
   const fetchStats = async () => {
     try {
       // Fetch total resources
@@ -187,13 +199,22 @@ const Index = () => {
 
   const fetchResources = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("Exam-prep")
         .select("*")
-        .eq("is_published", true)
-        .eq("show_in_recent", true)
+        .eq("is_published", true);
+
+      // If there's a search term, apply search filters
+      if (searchTerm.trim()) {
+        query = query.or(`title.ilike.%${searchTerm}%,subject.ilike.%${searchTerm}%,course.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      } else {
+        // Only show recent when no search term
+        query = query.eq("show_in_recent", true);
+      }
+
+      const { data, error } = await query
         .order("created_at", { ascending: false })
-        .limit(6);
+        .limit(searchTerm.trim() ? 50 : 6); // Show more results when searching
 
       if (error) throw error;
       setResources(data || []);
@@ -399,14 +420,11 @@ const Index = () => {
               <h1 className="text-2xl font-bold text-foreground">ExamAce Vault</h1>
             </div>
             <nav className="hidden md:flex space-x-6">
-              <Link to="/resources" className="text-muted-foreground hover:text-primary transition-colors">All Resources</Link>
-              <Link to="/subjects" className="text-muted-foreground hover:text-primary transition-colors">Subjects</Link>
+              <Link to="/" className="text-primary font-medium">Home</Link>
+              <Link to="/universities" className="text-muted-foreground hover:text-primary transition-colors">Universities</Link>
               <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">About Us</Link>
               <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">Contact Us</Link>
             </nav>
-            <Button asChild>
-              <Link to="/admin">Admin</Link>
-            </Button>
           </div>
         </div>
       </header>
@@ -570,10 +588,12 @@ const Index = () => {
             </div>
           </section>
 
-          {/* Recent Resources */}
-          <section className="py-16">
-            <div className="container mx-auto px-4">
-              <h3 className="text-3xl font-bold text-center text-foreground mb-12">Recently Added Resources</h3>
+              {/* Resources Section */}
+              <section className="py-16">
+                <div className="container mx-auto px-4">
+                  <h3 className="text-3xl font-bold text-center text-foreground mb-12">
+                    {searchTerm.trim() ? `Search Results for "${searchTerm}"` : "Recently Added Resources"}
+                  </h3>
               
               {loading ? (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
