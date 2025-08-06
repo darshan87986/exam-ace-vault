@@ -22,6 +22,9 @@ const App = () => (
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/universities" element={<Universities />} />
+          <Route path="/universities/:universityId" element={<Universities />} />
+          <Route path="/universities/:universityId/degrees/:degreeId" element={<Universities />} />
+          <Route path="/universities/:universityId/degrees/:degreeId/semesters/:semesterId" element={<Universities />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

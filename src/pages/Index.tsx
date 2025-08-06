@@ -470,32 +470,17 @@ const Index = () => {
             />
           </div>
 
-          {/* Navigation Buttons */}
-          <div className="flex flex-col sm:flex-row justify-center gap-6 mb-16">
-            <Button
-              size="lg"
-              onClick={() => setCurrentView("universities")}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 text-lg font-semibold"
-            >
-              <MapPin className="h-6 w-6 mr-3" />
-              Browse by University
-            </Button>
-            <Button
-              size="lg"
-              onClick={() => setCurrentView("degrees")}
-              className="bg-secondary hover:bg-secondary/90 text-secondary-foreground px-8 py-6 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 text-lg font-semibold"
-            >
-              <GraduationCap className="h-6 w-6 mr-3" />
-              Browse by Degree
-            </Button>
-            <Button
-              size="lg"
-              onClick={handleBackToHome}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-6 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 text-lg font-semibold"
-            >
-              <BookOpen className="h-6 w-6 mr-3" />
-              All Resources
-            </Button>
+          {/* Call to Action */}
+          <div className="flex justify-center">
+            <Link to="/universities">
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 text-lg font-semibold"
+              >
+                <MapPin className="h-6 w-6 mr-3" />
+                Choose Your University
+              </Button>
+            </Link>
           </div>
 
           {/* Filter Tabs - Only show on home view */}
@@ -569,500 +554,98 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Dynamic Content Based on Current View */}
-      {currentView === "home" && (
-        <>
-          {/* Stats Section */}
-          <section className="py-20 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5">
-            <div className="container mx-auto px-4">
-              <div className="text-center mb-12">
-                <h3 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Our Impact in Numbers</h3>
-                <p className="text-lg text-muted-foreground">Helping students succeed across the globe</p>
-              </div>
-              <div className="grid md:grid-cols-4 gap-8 text-center">
-                <AnimatedCounter target={stats.totalResources} label="Question Papers" />
-                <AnimatedCounter target={stats.totalUniversities} label="Universities" />
-                <AnimatedCounter target={stats.totalSubjects} label="Subjects" />
-                <AnimatedCounter target={stats.totalDownloads} label="Downloads" />
-              </div>
-            </div>
-          </section>
-
-              {/* Resources Section */}
-              <section className="py-16">
-                <div className="container mx-auto px-4">
-                  <h3 className="text-3xl font-bold text-center text-foreground mb-12">
-                    {searchTerm.trim() ? `Search Results for "${searchTerm}"` : "Recently Added Resources"}
-                  </h3>
-              
-              {loading ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {[...Array(6)].map((_, i) => (
-                    <Card key={i} className="animate-pulse bg-card/50">
-                      <CardHeader>
-                        <div className="h-4 bg-muted rounded w-3/4"></div>
-                        <div className="h-3 bg-muted rounded w-1/2"></div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-20 bg-muted rounded"></div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {filteredResources.map((resource) => (
-                    <Card 
-                      key={resource.id} 
-                      className="group cursor-pointer bg-gradient-to-br from-white to-gray-50/50 hover:from-white hover:to-primary/5 hover:shadow-2xl transition-all duration-500 hover:scale-105 border-0 shadow-lg hover:shadow-primary/10 backdrop-blur-sm"
-                    >
-                      <CardHeader className="relative">
-                        <div className="flex justify-between items-start">
-                          <CardTitle className="text-lg font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-                            {resource.title}
-                          </CardTitle>
-                          <Badge 
-                            variant="secondary"
-                            className="bg-gradient-to-r from-secondary/20 to-secondary/10 text-secondary-foreground hover:from-secondary/30 hover:to-secondary/20 transition-all border-0 shadow-sm"
-                          >
-                            {resource.resource_type?.replace('_', ' ').toUpperCase() || 'RESOURCE'}
-                          </Badge>
-                        </div>
-                        <CardDescription className="text-muted-foreground font-medium">
-                          {resource.subject} • {resource.course} • {resource.year}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-6 line-clamp-2 leading-relaxed">
-                          {resource.description}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Download className="h-4 w-4 mr-2" />
-                            <span className="font-medium">{resource.download_count} downloads</span>
-                          </div>
-                          <Button 
-                            size="sm"
-                            onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
-                            className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-              
-              {!loading && filteredResources.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground text-lg">No resources found matching your search.</p>
-                </div>
-              )}
-            </div>
-          </section>
-        </>
-      )}
-
-      {/* Universities View */}
-      {currentView === "universities" && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={handleBackToHome}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Home
-              </Button>
-            </div>
-            
-            <h3 className="text-3xl font-bold text-center text-foreground mb-12">Choose Your University</h3>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(3)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-muted rounded w-3/4"></div>
-                      <div className="h-4 bg-muted rounded w-1/2"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-20 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-4xl mx-auto">
-                {universities.map((university) => (
-                  <Card 
-                    key={university.id} 
-                    className="group cursor-pointer bg-gradient-to-br from-white to-gray-50/50 hover:from-white hover:to-primary/5 hover:shadow-2xl transition-all duration-500 hover:scale-105 border-0 shadow-lg hover:shadow-primary/10"
-                    onClick={() => handleUniversitySelect(university)}
-                  >
-                    <CardHeader className="text-center">
-                      <MapPin className="h-16 w-16 text-primary mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                      <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors">{university.code}</CardTitle>
-                      <CardDescription className="text-sm font-medium">{university.name}</CardDescription>
-                      {university.location && (
-                        <Badge variant="outline" className="mx-auto w-fit mt-2 border-primary/30 text-primary">
-                          {university.location}
-                        </Badge>
-                      )}
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Button className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-300">
-                        Browse {university.code} Degrees
-                        <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!loading && universities.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">No universities available</p>
-              </div>
-            )}
+      {/* Stats Section */}
+      <section className="py-20 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h3 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Our Impact in Numbers</h3>
+            <p className="text-lg text-muted-foreground">Helping students succeed across the globe</p>
           </div>
-        </section>
-      )}
-
-      {/* Degrees View */}
-      {currentView === "degrees" && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={selectedUniversity ? handleBackToUniversities : handleBackToHome}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {selectedUniversity ? `Back to Universities` : `Back to Home`}
-              </Button>
-            </div>
-            
-            <div className="text-center mb-12">
-              <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedUniversity ? `${selectedUniversity.name} - Choose Your Degree` : `Choose Your Degree`}
-              </h3>
-              {selectedUniversity && (
-                <p className="text-muted-foreground">
-                  Select a degree program from {selectedUniversity.code}
-                </p>
-              )}
-            </div>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(4)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-muted rounded w-3/4"></div>
-                      <div className="h-4 bg-muted rounded w-1/2"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-20 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-4xl mx-auto">
-                {degrees.map((degree) => (
-                  <Card 
-                    key={degree.id} 
-                    className="group cursor-pointer bg-gradient-to-br from-white to-gray-50/50 hover:from-white hover:to-secondary/5 hover:shadow-2xl transition-all duration-500 hover:scale-105 border-0 shadow-lg hover:shadow-secondary/10"
-                    onClick={() => handleDegreeSelect(degree)}
-                  >
-                    <CardHeader className="text-center">
-                      <GraduationCap className="h-16 w-16 text-secondary-foreground mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                      <CardTitle className="text-xl font-bold group-hover:text-secondary-foreground transition-colors">{degree.code}</CardTitle>
-                      <CardDescription className="text-sm font-medium">{degree.name}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <p className="text-muted-foreground mb-4 leading-relaxed">
-                        {degree.description || `Access ${degree.code} resources including question papers, solved papers, and notes.`}
-                      </p>
-                      <Button className="w-full bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary shadow-lg hover:shadow-xl transition-all duration-300">
-                        Browse {degree.code} Semesters
-                        <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+          <div className="grid md:grid-cols-4 gap-8 text-center">
+            <AnimatedCounter target={stats.totalResources} label="Question Papers" />
+            <AnimatedCounter target={stats.totalUniversities} label="Universities" />
+            <AnimatedCounter target={stats.totalSubjects} label="Subjects" />
+            <AnimatedCounter target={stats.totalDownloads} label="Downloads" />
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
-      {/* Semesters View */}
-      {currentView === "semesters" && selectedDegree && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={handleBackToDegrees}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Degrees
-              </Button>
-            </div>
-            
-            <div className="text-center mb-12">
-              <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedDegree.name} - Choose Semester
-              </h3>
-              <p className="text-muted-foreground">
-                Select a semester to view available subjects
-              </p>
-            </div>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-muted rounded w-3/4"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-16 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {semesters.map((semester) => (
-                  <Card 
-                    key={semester.id} 
-                    className="group cursor-pointer bg-gradient-to-br from-white to-gray-50/50 hover:from-white hover:to-accent/5 hover:shadow-2xl transition-all duration-500 hover:scale-105 border-0 shadow-lg hover:shadow-accent/10"
-                    onClick={() => handleSemesterSelect(semester)}
-                  >
-                    <CardHeader className="text-center">
-                      <div className="h-16 w-16 bg-gradient-to-br from-accent/10 to-accent/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:from-accent/20 group-hover:to-accent/10 transition-all group-hover:scale-110">
-                        <span className="text-2xl font-bold text-accent-foreground">{semester.semester_number}</span>
-                      </div>
-                      <CardTitle className="text-lg font-bold group-hover:text-accent-foreground transition-colors">{semester.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Button className="w-full bg-gradient-to-r from-accent to-accent/90 hover:from-accent/90 hover:to-accent shadow-lg hover:shadow-xl transition-all duration-300">
-                        View Subjects
-                        <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!loading && semesters.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">No semesters available for {selectedDegree.name}</p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Subjects View */}
-      {currentView === "subjects" && selectedSemester && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={handleBackToSemesters}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Semesters
-              </Button>
-            </div>
-            
-            <div className="text-center mb-12">
-              <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedDegree?.code} - {selectedSemester.name} - Choose Subject
-              </h3>
-              <p className="text-muted-foreground">
-                Select a subject to view available question papers, solved papers, and notes
-              </p>
-            </div>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-muted rounded w-3/4"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-16 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {subjects.map((subject) => (
-                  <Card 
-                    key={subject.id} 
-                    className="group cursor-pointer bg-gradient-to-br from-white to-gray-50/50 hover:from-white hover:to-primary/5 hover:shadow-2xl transition-all duration-500 hover:scale-105 border-0 shadow-lg hover:shadow-primary/10"
-                    onClick={() => handleSubjectSelect(subject)}
-                  >
-                    <CardHeader className="text-center">
-                      <BookOpen className="h-12 w-12 text-primary mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                      <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors">{subject.name}</CardTitle>
-                      <CardDescription className="text-sm font-medium">{subject.code}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <p className="text-muted-foreground text-sm mb-4 leading-relaxed">
-                        {subject.description || `Study materials for ${subject.name}`}
-                      </p>
-                      <Button className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-300">
-                        View {subject.code} Resources
-                        <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!loading && subjects.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">No subjects available for {selectedSemester.name}</p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Resources View */}
-      {currentView === "resources" && selectedSubject && (
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-8">
-              <Button
-                variant="ghost"
-                onClick={handleBackToSubjects}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Subjects
-              </Button>
-            </div>
-            
-            <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-foreground mb-4">
-                {selectedDegree?.code} - {selectedSemester?.name} - {selectedSubject.name}
-              </h3>
-              <p className="text-muted-foreground">
-                Browse and download resources for {selectedSubject.name}
-              </p>
-            </div>
-
-            {/* Resource Type Filter */}
-            <div className="flex justify-center space-x-2 mb-8">
-              {[
-                { key: "all", label: "All Resources" },
-                { key: "question_paper", label: "Question Papers" },
-                { key: "solved_paper", label: "Solved Papers" },
-                { key: "notes", label: "Study Notes" }
-              ].map((type) => (
-                <Button
-                  key={type.key}
-                  variant={selectedType === type.key ? "default" : "outline"}
-                  onClick={() => setSelectedType(type.key)}
-                  className="rounded-full"
-                >
-                  {type.label}
-                </Button>
+      {/* Resources Section */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <h3 className="text-3xl font-bold text-center text-foreground mb-12">
+            {searchTerm.trim() ? `Search Results for "${searchTerm}"` : "Recently Added Resources"}
+          </h3>
+      
+          {loading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i} className="animate-pulse bg-card/50">
+                  <CardHeader>
+                    <div className="h-4 bg-muted rounded w-3/4"></div>
+                    <div className="h-3 bg-muted rounded w-1/2"></div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-20 bg-muted rounded"></div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-            
-            {loading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-4 bg-muted rounded w-3/4"></div>
-                      <div className="h-3 bg-muted rounded w-1/2"></div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-20 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredResources.map((resource) => (
-                  <Card key={resource.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{resource.title}</CardTitle>
-                          <CardDescription>{resource.course} • {resource.year}</CardDescription>
-                        </div>
-                        <Badge variant="secondary">
-                          {resource.resource_type.replace("_", " ")}
-                        </Badge>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredResources.map((resource) => (
+                <Card 
+                  key={resource.id} 
+                  className="group cursor-pointer bg-gradient-to-br from-white to-gray-50/50 hover:from-white hover:to-primary/5 hover:shadow-2xl transition-all duration-500 hover:scale-105 border-0 shadow-lg hover:shadow-primary/10 backdrop-blur-sm"
+                >
+                  <CardHeader className="relative">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+                        {resource.title}
+                      </CardTitle>
+                      <Badge 
+                        variant="secondary"
+                        className="bg-gradient-to-r from-secondary/20 to-secondary/10 text-secondary-foreground hover:from-secondary/30 hover:to-secondary/20 transition-all border-0 shadow-sm"
+                      >
+                        {resource.resource_type?.replace('_', ' ').toUpperCase() || 'RESOURCE'}
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-muted-foreground font-medium">
+                      {resource.subject} • {resource.course} • {resource.year}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-6 line-clamp-2 leading-relaxed">
+                      {resource.description}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Download className="h-4 w-4 mr-2" />
+                        <span className="font-medium">{resource.download_count} downloads</span>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {resource.description || "Comprehensive study material for exam preparation"}
-                      </p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">
-                          <Download className="h-4 w-4 inline mr-1" />
-                          {resource.download_count} downloads
-                        </span>
-                        <Button
-                          size="sm"
-                          onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
-                        >
-                          Download
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            
-            {!loading && filteredResources.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">
-                  No {selectedType === "all" ? "resources" : selectedType.replace("_", " ")} found for {selectedSubject.name}
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+                      <Button 
+                        size="sm"
+                        onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
+                        className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          
+          {!loading && filteredResources.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">No resources found matching your search.</p>
+            </div>
+          )}
+        </div>
+      </section>
 
-      {/* Comment Sections for Degrees */}
-      {selectedDegree && currentView !== "home" && (
-        <section className="py-16 bg-muted/30">
-          <CommentSection 
-            degreeId={selectedDegree.id} 
-            degreeName={selectedDegree.name} 
-          />
-        </section>
-      )}
 
       {/* Footer */}
       <footer className="bg-card border-t py-12">

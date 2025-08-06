@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, MapPin, ChevronRight, ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { GraduationCap, MapPin, ChevronRight, ArrowLeft, BookOpen } from "lucide-react";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -36,27 +36,86 @@ interface Subject {
 }
 
 const Universities = () => {
+  const navigate = useNavigate();
+  const { universityId, degreeId, semesterId } = useParams();
   const [universities, setUniversities] = useState<University[]>([]);
   const [degrees, setDegrees] = useState<Degree[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<"universities" | "degrees" | "semesters" | "subjects">("universities");
   const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
   const [selectedDegree, setSelectedDegree] = useState<Degree | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
 
+  // Determine current view based on URL
+  const currentView = semesterId ? "subjects" : degreeId ? "semesters" : universityId ? "degrees" : "universities";
+
   useEffect(() => {
+    // Load data based on URL parameters
     if (currentView === "universities") {
       fetchUniversities();
-    } else if (currentView === "degrees") {
+    } else if (currentView === "degrees" && universityId) {
+      fetchUniversityById(universityId);
       fetchDegrees();
-    } else if (currentView === "semesters" && selectedDegree) {
+    } else if (currentView === "semesters" && degreeId) {
+      fetchDegreeById(degreeId);
       fetchSemesters();
-    } else if (currentView === "subjects" && selectedSemester) {
+    } else if (currentView === "subjects" && semesterId) {
+      fetchSemesterById(semesterId);
       fetchSubjects();
     }
-  }, [currentView, selectedUniversity, selectedDegree, selectedSemester]);
+  }, [currentView, universityId, degreeId, semesterId]);
+
+  const fetchUniversityById = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("universities")
+        .select("*")
+        .eq("id", id)
+        .eq("is_active", true)
+        .single();
+
+      if (error) throw error;
+      setSelectedUniversity(data);
+    } catch (error) {
+      console.error("Error fetching university:", error);
+    }
+  };
+
+  const fetchDegreeById = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("degrees")
+        .select("*, universities(*)")
+        .eq("id", id)
+        .eq("is_active", true)
+        .single();
+
+      if (error) throw error;
+      setSelectedDegree(data);
+      setSelectedUniversity(data.universities);
+    } catch (error) {
+      console.error("Error fetching degree:", error);
+    }
+  };
+
+  const fetchSemesterById = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("semesters")
+        .select("*, degrees(*, universities(*))")
+        .eq("id", id)
+        .eq("is_active", true)
+        .single();
+
+      if (error) throw error;
+      setSelectedSemester(data);
+      setSelectedDegree(data.degrees);
+      setSelectedUniversity(data.degrees.universities);
+    } catch (error) {
+      console.error("Error fetching semester:", error);
+    }
+  };
 
   const fetchUniversities = async () => {
     try {
@@ -84,8 +143,8 @@ const Universities = () => {
         .select("*")
         .eq("is_active", true);
       
-      if (selectedUniversity) {
-        query = query.eq("university_id", selectedUniversity.id);
+      if (universityId) {
+        query = query.eq("university_id", universityId);
       }
       
       const { data, error } = await query.order("name");
@@ -105,7 +164,7 @@ const Universities = () => {
       const { data, error } = await supabase
         .from("semesters" as any)
         .select("*")
-        .eq("degree_id", selectedDegree?.id)
+        .eq("degree_id", degreeId)
         .eq("is_active", true)
         .order("semester_number");
 
@@ -124,7 +183,7 @@ const Universities = () => {
       const { data, error } = await supabase
         .from("subjects" as any)
         .select("*")
-        .eq("semester_id", selectedSemester?.id)
+        .eq("semester_id", semesterId)
         .eq("is_active", true)
         .order("name");
 
@@ -138,38 +197,15 @@ const Universities = () => {
   };
 
   const handleUniversitySelect = (university: University) => {
-    setSelectedUniversity(university);
-    setSelectedDegree(null);
-    setSelectedSemester(null);
-    setCurrentView("degrees");
+    navigate(`/universities/${university.id}`);
   };
 
   const handleDegreeSelect = (degree: Degree) => {
-    setSelectedDegree(degree);
-    setSelectedSemester(null);
-    setCurrentView("semesters");
+    navigate(`/universities/${universityId}/degrees/${degree.id}`);
   };
 
   const handleSemesterSelect = (semester: Semester) => {
-    setSelectedSemester(semester);
-    setCurrentView("subjects");
-  };
-
-  const handleBackToUniversities = () => {
-    setSelectedUniversity(null);
-    setSelectedDegree(null);
-    setSelectedSemester(null);
-    setCurrentView("universities");
-  };
-
-  const handleBackToDegrees = () => {
-    setSelectedDegree(null);
-    setSelectedSemester(null);
-    setCurrentView("degrees");
-  };
-
-  const handleBackToSemesters = () => {
-    setCurrentView("semesters");
+    navigate(`/universities/${universityId}/degrees/${degreeId}/semesters/${semester.id}`);
   };
 
   return (
@@ -218,7 +254,7 @@ const Universities = () => {
               <>
                 <Link to="/universities" className="text-muted-foreground hover:text-primary">Universities</Link>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                <button onClick={handleBackToDegrees} className="text-muted-foreground hover:text-primary">{selectedUniversity?.name}</button>
+                <Link to={`/universities/${universityId}`} className="text-muted-foreground hover:text-primary">{selectedUniversity?.name}</Link>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 <span className="text-primary font-medium">{selectedDegree?.name}</span>
               </>
@@ -228,9 +264,9 @@ const Universities = () => {
               <>
                 <Link to="/universities" className="text-muted-foreground hover:text-primary">Universities</Link>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                <button onClick={handleBackToDegrees} className="text-muted-foreground hover:text-primary">{selectedUniversity?.name}</button>
+                <Link to={`/universities/${universityId}`} className="text-muted-foreground hover:text-primary">{selectedUniversity?.name}</Link>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                <button onClick={handleBackToSemesters} className="text-muted-foreground hover:text-primary">{selectedDegree?.name}</button>
+                <Link to={`/universities/${universityId}/degrees/${degreeId}`} className="text-muted-foreground hover:text-primary">{selectedDegree?.name}</Link>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 <span className="text-primary font-medium">{selectedSemester?.name}</span>
               </>
@@ -300,9 +336,11 @@ const Universities = () => {
       {currentView === "degrees" && (
         <section className="py-16">
           <div className="container mx-auto px-4">
-            <Button variant="outline" onClick={handleBackToUniversities} className="mb-8">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Universities
+            <Button variant="outline" asChild className="mb-8">
+              <Link to="/universities">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Universities
+              </Link>
             </Button>
 
             <div className="text-center mb-12">
@@ -359,9 +397,11 @@ const Universities = () => {
       {currentView === "semesters" && (
         <section className="py-16">
           <div className="container mx-auto px-4">
-            <Button variant="outline" onClick={handleBackToDegrees} className="mb-8">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Degrees
+            <Button variant="outline" asChild className="mb-8">
+              <Link to={`/universities/${universityId}`}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Degrees
+              </Link>
             </Button>
 
             <div className="text-center mb-12">
@@ -419,9 +459,11 @@ const Universities = () => {
       {currentView === "subjects" && (
         <section className="py-16">
           <div className="container mx-auto px-4">
-            <Button variant="outline" onClick={handleBackToSemesters} className="mb-8">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Semesters
+            <Button variant="outline" asChild className="mb-8">
+              <Link to={`/universities/${universityId}/degrees/${degreeId}`}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Semesters
+              </Link>
             </Button>
 
             <div className="text-center mb-12">
