@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Download, BookOpen, FileText, GraduationCap, Users, ArrowLeft, ChevronRight, MapPin, Award, TrendingUp, Star } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { Search, Download, BookOpen, FileText, GraduationCap, Users, ArrowLeft, ChevronRight, MapPin } from "lucide-react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { CommentSection } from "@/components/CommentSection";
@@ -52,67 +52,6 @@ interface University {
   location?: string;
 }
 
-interface Stats {
-  totalResources: number;
-  totalUniversities: number;
-  totalSubjects: number;
-  totalDownloads: number;
-}
-
-// Counter Animation Component
-const AnimatedCounter = ({ target, label }: { target: number; label: string }) => {
-  const [count, setCount] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (isVisible && target > 0) {
-      const duration = 2000; // 2 seconds
-      const steps = 60;
-      const increment = target / steps;
-      let current = 0;
-
-      const timer = setInterval(() => {
-        current += increment;
-        if (current >= target) {
-          setCount(target);
-          clearInterval(timer);
-        } else {
-          setCount(Math.floor(current));
-        }
-      }, duration / steps);
-
-      return () => clearInterval(timer);
-    }
-  }, [isVisible, target]);
-
-  return (
-    <div ref={ref} className="space-y-2">
-      <div className="text-4xl font-bold text-primary">
-        {count.toLocaleString()}+
-      </div>
-      <div className="text-muted-foreground">{label}</div>
-    </div>
-  );
-};
-
 const Index = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [resources, setResources] = useState<ExamResource[]>([]);
@@ -127,12 +66,10 @@ const Index = () => {
   const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [currentView, setCurrentView] = useState<"home" | "universities" | "degrees" | "semesters" | "subjects" | "resources">("home");
-  const [stats, setStats] = useState<Stats>({ totalResources: 0, totalUniversities: 0, totalSubjects: 0, totalDownloads: 0 });
 
   useEffect(() => {
     if (currentView === "home") {
       fetchResources();
-      fetchStats();
     } else if (currentView === "universities") {
       fetchUniversities();
     } else if (currentView === "degrees") {
@@ -146,75 +83,15 @@ const Index = () => {
     }
   }, [currentView, selectedUniversity, selectedDegree, selectedSemester, selectedSubject]);
 
-  // Separate useEffect for search functionality
-  useEffect(() => {
-    if (currentView === "home") {
-      const debounceTimer = setTimeout(() => {
-        setLoading(true);
-        fetchResources();
-      }, 300); // Debounce search by 300ms
-
-      return () => clearTimeout(debounceTimer);
-    }
-  }, [searchTerm, currentView]);
-
-  const fetchStats = async () => {
-    try {
-      // Fetch total resources
-      const { count: resourceCount } = await supabase
-        .from("Exam-prep")
-        .select("*", { count: "exact", head: true })
-        .eq("is_published", true);
-
-      // Fetch total universities
-      const { count: universityCount } = await supabase
-        .from("universities")
-        .select("*", { count: "exact", head: true })
-        .eq("is_active", true);
-
-      // Fetch total subjects
-      const { count: subjectCount } = await supabase
-        .from("subjects")
-        .select("*", { count: "exact", head: true })
-        .eq("is_active", true);
-
-      // Fetch total downloads
-      const { data: downloadData } = await supabase
-        .from("Exam-prep")
-        .select("download_count")
-        .eq("is_published", true);
-
-      const totalDownloads = downloadData?.reduce((sum, item) => sum + (item.download_count || 0), 0) || 0;
-
-      setStats({
-        totalResources: resourceCount || 0,
-        totalUniversities: universityCount || 0,
-        totalSubjects: subjectCount || 0,
-        totalDownloads: totalDownloads
-      });
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-    }
-  };
-
   const fetchResources = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("Exam-prep")
         .select("*")
-        .eq("is_published", true);
-
-      // If there's a search term, apply search filters
-      if (searchTerm.trim()) {
-        query = query.or(`title.ilike.%${searchTerm}%,subject.ilike.%${searchTerm}%,course.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
-      } else {
-        // Only show recent when no search term
-        query = query.eq("show_in_recent", true);
-      }
-
-      const { data, error } = await query
+        .eq("is_published", true)
+        .eq("show_in_recent", true)
         .order("created_at", { ascending: false })
-        .limit(searchTerm.trim() ? 50 : 6); // Show more results when searching
+        .limit(6);
 
       if (error) throw error;
       setResources(data || []);
@@ -420,72 +297,76 @@ const Index = () => {
               <h1 className="text-2xl font-bold text-foreground">ExamAce Vault</h1>
             </div>
             <nav className="hidden md:flex space-x-6">
-              <Link to="/" className="text-primary font-medium">Home</Link>
-              <Link to="/universities" className="text-muted-foreground hover:text-primary transition-colors">Universities</Link>
-              <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">About Us</Link>
-              <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">Contact Us</Link>
+              <Link to="/resources" className="text-muted-foreground hover:text-foreground">All Resources</Link>
+              <Link to="/subjects" className="text-muted-foreground hover:text-foreground">Subjects</Link>
+              <Link to="/about" className="text-muted-foreground hover:text-foreground">About</Link>
+              <Link to="/contact" className="text-muted-foreground hover:text-foreground">Contact</Link>
             </nav>
+            <Button asChild>
+              <Link to="/admin">Admin</Link>
+            </Button>
           </div>
         </div>
       </header>
 
-
       {/* Hero Section */}
-      <section className="relative min-h-[90vh] bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5 flex items-center justify-center overflow-hidden">
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent/5 rounded-full blur-3xl"></div>
-        </div>
-        
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <div className="mb-8">
-            <div className="inline-flex items-center bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
-              <Star className="h-4 w-4 mr-2" />
-              Trusted by thousands of students
-            </div>
-          </div>
-          
-          <h1 className="text-5xl md:text-7xl font-extrabold text-foreground mb-6 leading-tight">
+      <section className="bg-gradient-to-br from-primary/10 via-background to-secondary/10 py-20">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
             Your Ultimate
-            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent"> Exam Success </span>
-            Platform
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-4xl mx-auto leading-relaxed">
+            <span className="text-primary"> Exam Resource </span>
+            Hub
+          </h2>
+          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
             Access thousands of previous year question papers, solved papers, and comprehensive study notes. 
-            Everything you need to excel in your degree exams, all in one place.
+            Everything you need to ace your degree exams, all in one place.
           </p>
           
           {/* Search Bar */}
-          <div className="max-w-3xl mx-auto relative mb-12">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-6 w-6" />
+          <div className="max-w-2xl mx-auto relative mb-8">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
               type="text"
               placeholder="Search by subject, course, or topic..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 h-16 text-lg rounded-2xl border-0 bg-white/80 backdrop-blur-sm shadow-xl focus:shadow-2xl transition-all duration-300"
+              className="pl-10 h-12 text-lg"
             />
           </div>
 
-          {/* Call to Action */}
-          <div className="flex justify-center">
-            <Link to="/universities">
-              <Button
-                size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 text-lg font-semibold"
-              >
-                <MapPin className="h-6 w-6 mr-3" />
-                Choose Your University
-              </Button>
-            </Link>
+          {/* Navigation Buttons */}
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
+            <Button
+              size="lg"
+              onClick={() => setCurrentView("universities")}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-4"
+            >
+              <MapPin className="h-5 w-5 mr-2" />
+              Browse by University
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setCurrentView("degrees")}
+              className="px-6 sm:px-8 py-4"
+            >
+              <GraduationCap className="h-5 w-5 mr-2" />
+              Browse by Degree
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleBackToHome}
+              className="px-6 sm:px-8 py-4"
+            >
+              <BookOpen className="h-5 w-5 mr-2" />
+              All Resources
+            </Button>
           </div>
 
           {/* Filter Tabs - Only show on home view */}
           {currentView === "home" && (
-            <div className="flex flex-wrap justify-center gap-3 mb-8">
+            <div className="flex justify-center space-x-2 mb-12">
               {[
                 { key: "all", label: "All Resources" },
                 { key: "question_paper", label: "Question Papers" },
@@ -496,11 +377,7 @@ const Index = () => {
                   key={type.key}
                   variant={selectedType === type.key ? "default" : "outline"}
                   onClick={() => setSelectedType(type.key)}
-                  className={`rounded-full px-6 py-3 font-medium transition-all duration-300 ${
-                    selectedType === type.key 
-                      ? "bg-primary text-primary-foreground shadow-lg scale-105" 
-                      : "bg-white/60 backdrop-blur-sm hover:bg-secondary/20 hover:text-secondary-foreground hover:scale-105"
-                  }`}
+                  className="rounded-full"
                 >
                   {type.label}
                 </Button>
@@ -510,142 +387,516 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Why Choose Us Section */}
-      <section className="py-20 bg-gradient-to-r from-secondary/10 to-accent/10">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-primary mb-4">Why Choose ExamAce Vault?</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Join thousands of students who trust us for their exam preparation needs
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
-            <div className="text-center group cursor-pointer">
-              <div className="bg-gradient-to-br from-primary/10 to-primary/5 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 transform group-hover:scale-110 shadow-lg group-hover:shadow-xl">
-                <BookOpen className="h-10 w-10 text-primary" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-4 group-hover:text-primary transition-colors">Comprehensive Collection</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Thousands of question papers, solved papers, and study notes covering all major subjects and courses from top universities.
-              </p>
-            </div>
-            
-            <div className="text-center group cursor-pointer">
-              <div className="bg-gradient-to-br from-secondary/20 to-secondary/10 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:from-secondary/30 group-hover:to-secondary/20 transition-all duration-300 transform group-hover:scale-110 shadow-lg group-hover:shadow-xl">
-                <Award className="h-10 w-10 text-secondary-foreground" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-4 group-hover:text-secondary-foreground transition-colors">Premium Quality</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                All resources are carefully curated, verified for accuracy, and updated regularly to ensure you get the best study materials.
-              </p>
-            </div>
-            
-            <div className="text-center group cursor-pointer">
-              <div className="bg-gradient-to-br from-accent/20 to-accent/10 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:from-accent/30 group-hover:to-accent/20 transition-all duration-300 transform group-hover:scale-110 shadow-lg group-hover:shadow-xl">
-                <TrendingUp className="h-10 w-10 text-accent-foreground" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-4 group-hover:text-accent-foreground transition-colors">Completely Free</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Complete free access to all resources. No hidden fees, no subscriptions. Quality education should be accessible to everyone.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-20 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h3 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Our Impact in Numbers</h3>
-            <p className="text-lg text-muted-foreground">Helping students succeed across the globe</p>
-          </div>
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <AnimatedCounter target={stats.totalResources} label="Question Papers" />
-            <AnimatedCounter target={stats.totalUniversities} label="Universities" />
-            <AnimatedCounter target={stats.totalSubjects} label="Subjects" />
-            <AnimatedCounter target={stats.totalDownloads} label="Downloads" />
-          </div>
-        </div>
-      </section>
-
-      {/* Resources Section */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <h3 className="text-3xl font-bold text-center text-foreground mb-12">
-            {searchTerm.trim() ? `Search Results for "${searchTerm}"` : "Recently Added Resources"}
-          </h3>
-      
-          {loading ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse bg-card/50">
+      {/* Dynamic Content Based on Current View */}
+      {currentView === "home" && (
+        <>
+          {/* Features Section */}
+          <section className="py-16 bg-card/50">
+            <div className="container mx-auto px-4">
+              <h3 className="text-3xl font-bold text-center text-foreground mb-12">Why Choose ExamAce Vault?</h3>
+              <div className="grid md:grid-cols-3 gap-8">
+                <Card className="text-center">
                   <CardHeader>
-                    <div className="h-4 bg-muted rounded w-3/4"></div>
-                    <div className="h-3 bg-muted rounded w-1/2"></div>
+                    <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
+                    <CardTitle>Comprehensive Collection</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-20 bg-muted rounded"></div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredResources.map((resource) => (
-                <Card 
-                  key={resource.id} 
-                  className="group cursor-pointer bg-gradient-to-br from-white to-gray-50/50 hover:from-white hover:to-primary/5 hover:shadow-2xl transition-all duration-500 hover:scale-105 border-0 shadow-lg hover:shadow-primary/10 backdrop-blur-sm"
-                >
-                  <CardHeader className="relative">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-                        {resource.title}
-                      </CardTitle>
-                      <Badge 
-                        variant="secondary"
-                        className="bg-gradient-to-r from-secondary/20 to-secondary/10 text-secondary-foreground hover:from-secondary/30 hover:to-secondary/20 transition-all border-0 shadow-sm"
-                      >
-                        {resource.resource_type?.replace('_', ' ').toUpperCase() || 'RESOURCE'}
-                      </Badge>
-                    </div>
-                    <CardDescription className="text-muted-foreground font-medium">
-                      {resource.subject} • {resource.course} • {resource.year}
+                    <CardDescription>
+                      Thousands of question papers, solved papers, and study notes covering all major subjects and courses.
                     </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-6 line-clamp-2 leading-relaxed">
-                      {resource.description}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Download className="h-4 w-4 mr-2" />
-                        <span className="font-medium">{resource.download_count} downloads</span>
-                      </div>
-                      <Button 
-                        size="sm"
-                        onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
-                        className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 rounded-full"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
+                
+                <Card className="text-center">
+                  <CardHeader>
+                    <FileText className="h-12 w-12 text-primary mx-auto mb-4" />
+                    <CardTitle>High Quality Content</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>
+                      All resources are carefully curated and verified for accuracy. Get the most reliable study materials.
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+                
+                <Card className="text-center">
+                  <CardHeader>
+                    <Users className="h-12 w-12 text-primary mx-auto mb-4" />
+                    <CardTitle>Free Access</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>
+                      Complete free access to all resources. No hidden fees, no subscriptions. Education should be accessible to all.
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </section>
+
+          {/* Recent Resources */}
+          <section className="py-16">
+            <div className="container mx-auto px-4">
+              <h3 className="text-3xl font-bold text-center text-foreground mb-12">Recently Added Resources</h3>
+              
+              {loading ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardHeader>
+                        <div className="h-4 bg-muted rounded w-3/4"></div>
+                        <div className="h-3 bg-muted rounded w-1/2"></div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-20 bg-muted rounded"></div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredResources.map((resource) => (
+                    <Card key={resource.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg">{resource.title}</CardTitle>
+                            <CardDescription>{resource.course} • {resource.year}</CardDescription>
+                          </div>
+                          <Badge variant="secondary">
+                            {resource.resource_type.replace("_", " ")}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {resource.description || "Comprehensive study material for exam preparation"}
+                        </p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">
+                            <Download className="h-4 w-4 inline mr-1" />
+                            {resource.download_count} downloads
+                          </span>
+                          <Button
+                            size="sm"
+                            onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
+                          >
+                            Download
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+              
+              {!loading && filteredResources.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground text-lg">No resources found matching your search.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* Universities View */}
+      {currentView === "universities" && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={handleBackToHome}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Home
+              </Button>
+            </div>
+            
+            <h3 className="text-3xl font-bold text-center text-foreground mb-12">Choose Your University</h3>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-20 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                {universities.map((university) => (
+                  <Card 
+                    key={university.id} 
+                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
+                    onClick={() => handleUniversitySelect(university)}
+                  >
+                    <CardHeader className="text-center">
+                      <MapPin className="h-16 w-16 text-primary mx-auto mb-4" />
+                      <CardTitle className="text-xl">{university.code}</CardTitle>
+                      <CardDescription className="text-sm">{university.name}</CardDescription>
+                      {university.location && (
+                        <Badge variant="outline" className="mx-auto w-fit mt-2">
+                          {university.location}
+                        </Badge>
+                      )}
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <Button className="w-full">
+                        Browse {university.code} Degrees
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {!loading && universities.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">No universities available</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Degrees View */}
+      {currentView === "degrees" && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={selectedUniversity ? handleBackToUniversities : handleBackToHome}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {selectedUniversity ? `Back to Universities` : `Back to Home`}
+              </Button>
+            </div>
+            
+            <div className="text-center mb-12">
+              <h3 className="text-3xl font-bold text-foreground mb-4">
+                {selectedUniversity ? `${selectedUniversity.name} - Choose Your Degree` : `Choose Your Degree`}
+              </h3>
+              {selectedUniversity && (
+                <p className="text-muted-foreground">
+                  Select a degree program from {selectedUniversity.code}
+                </p>
+              )}
+            </div>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-20 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                {degrees.map((degree) => (
+                  <Card 
+                    key={degree.id} 
+                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
+                    onClick={() => handleDegreeSelect(degree)}
+                  >
+                    <CardHeader className="text-center">
+                      <GraduationCap className="h-16 w-16 text-primary mx-auto mb-4" />
+                      <CardTitle className="text-xl">{degree.code}</CardTitle>
+                      <CardDescription className="text-sm">{degree.name}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <p className="text-muted-foreground mb-4">
+                        {degree.description || `Access ${degree.code} resources including question papers, solved papers, and notes.`}
+                      </p>
+                      <Button className="w-full">
+                        Browse {degree.code} Semesters
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Semesters View */}
+      {currentView === "semesters" && selectedDegree && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={handleBackToDegrees}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Degrees
+              </Button>
+            </div>
+            
+            <div className="text-center mb-12">
+              <h3 className="text-3xl font-bold text-foreground mb-4">
+                {selectedDegree.name} - Choose Semester
+              </h3>
+              <p className="text-muted-foreground">
+                Select a semester to view available subjects
+              </p>
+            </div>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-16 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {semesters.map((semester) => (
+                  <Card 
+                    key={semester.id} 
+                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
+                    onClick={() => handleSemesterSelect(semester)}
+                  >
+                    <CardHeader className="text-center">
+                      <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl font-bold text-primary">{semester.semester_number}</span>
+                      </div>
+                      <CardTitle className="text-lg">{semester.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <Button className="w-full">
+                        View Subjects
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {!loading && semesters.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">No semesters available for {selectedDegree.name}</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Subjects View */}
+      {currentView === "subjects" && selectedSemester && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={handleBackToSemesters}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Semesters
+              </Button>
+            </div>
+            
+            <div className="text-center mb-12">
+              <h3 className="text-3xl font-bold text-foreground mb-4">
+                {selectedDegree?.code} - {selectedSemester.name} - Choose Subject
+              </h3>
+              <p className="text-muted-foreground">
+                Select a subject to view available question papers, solved papers, and notes
+              </p>
+            </div>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-16 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {subjects.map((subject) => (
+                  <Card 
+                    key={subject.id} 
+                    className="hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-105"
+                    onClick={() => handleSubjectSelect(subject)}
+                  >
+                    <CardHeader className="text-center">
+                      <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
+                      <CardTitle className="text-lg">{subject.name}</CardTitle>
+                      <CardDescription className="text-sm">{subject.code}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <p className="text-muted-foreground text-sm mb-4">
+                        {subject.description || `Study materials for ${subject.name}`}
+                      </p>
+                      <Button className="w-full">
+                        View {subject.code} Resources
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {!loading && subjects.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">No subjects available for {selectedSemester.name}</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Resources View */}
+      {currentView === "resources" && selectedSubject && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={handleBackToSubjects}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Subjects
+              </Button>
+            </div>
+            
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold text-foreground mb-4">
+                {selectedDegree?.code} - {selectedSemester?.name} - {selectedSubject.name}
+              </h3>
+              <p className="text-muted-foreground">
+                Browse and download resources for {selectedSubject.name}
+              </p>
+            </div>
+
+            {/* Resource Type Filter */}
+            <div className="flex justify-center space-x-2 mb-8">
+              {[
+                { key: "all", label: "All Resources" },
+                { key: "question_paper", label: "Question Papers" },
+                { key: "solved_paper", label: "Solved Papers" },
+                { key: "notes", label: "Study Notes" }
+              ].map((type) => (
+                <Button
+                  key={type.key}
+                  variant={selectedType === type.key ? "default" : "outline"}
+                  onClick={() => setSelectedType(type.key)}
+                  className="rounded-full"
+                >
+                  {type.label}
+                </Button>
               ))}
             </div>
-          )}
-          
-          {!loading && filteredResources.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground text-lg">No resources found matching your search.</p>
-            </div>
-          )}
-        </div>
-      </section>
+            
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-20 bg-muted rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredResources.map((resource) => (
+                  <Card key={resource.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">{resource.title}</CardTitle>
+                          <CardDescription>{resource.course} • {resource.year}</CardDescription>
+                        </div>
+                        <Badge variant="secondary">
+                          {resource.resource_type.replace("_", " ")}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {resource.description || "Comprehensive study material for exam preparation"}
+                      </p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">
+                          <Download className="h-4 w-4 inline mr-1" />
+                          {resource.download_count} downloads
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDownload(resource.id, resource.file_path, resource.title)}
+                        >
+                          Download
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            
+            {!loading && filteredResources.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">
+                  No {selectedType === "all" ? "resources" : selectedType.replace("_", " ")} found for {selectedSubject.name}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
+      {/* Comment Sections for Degrees */}
+      {selectedDegree && currentView !== "home" && (
+        <section className="py-16 bg-muted/30">
+          <CommentSection 
+            degreeId={selectedDegree.id} 
+            degreeName={selectedDegree.name} 
+          />
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-card border-t py-12">
